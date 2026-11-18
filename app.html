@@ -157,6 +157,7 @@ table.census tr.dc td{color:var(--muted)}
 .linkish:hover{text-decoration-color:var(--accent)}
 .loc-sel,.h-sel{border:1px solid color-mix(in srgb,var(--c) 45%,var(--line));background:color-mix(in srgb,var(--c) 12%,var(--surface));color:var(--c);font-weight:700;border-radius:6px;padding:4px 6px;font-size:13px}
 .h-sel{--c:var(--muted);font-weight:600}
+.loc-sel.static{--c:var(--dc);display:inline-block}
 .h-sel.lpd{--c:var(--php)}
 .of{color:var(--muted);font-size:11.5px}
 .locfilter{display:flex;flex-wrap:wrap;gap:4px}
@@ -299,6 +300,8 @@ const DAY_SHORT={mon:'M',tue:'Tu',wed:'W',thu:'Th',fri:'F',sat:'Sa'};
 /* LOC carries the frequency: PC6 = partial care 6 days/wk, IOP4 = IOP 4 days/wk, EIOP = evening IOP. */
 const LEVELS=['PC6','PC5','IOP6','IOP5','IOP4','IOP3','EIOP','OP'];
 const LOCS=['Pending',...LEVELS,'Discharged'];
+/* Discharged is a status set by the date of discharge, not a choosable LOC. */
+const PICK_LOCS=['Pending',...LEVELS];
 const LOC_NAME=Object.fromEntries(LOCS.map(l=>[l,l]));
 const GROUPS=['PC','IOP','EIOP','OP'];
 const GROUP_SUB={PC:'partial care',IOP:'IOP3–IOP6',EIOP:'evening IOP',OP:'outpatient'};
@@ -514,7 +517,7 @@ function moveSlot(id,fromDay,toDay,toBlock){
 function runScheduled(){
   const done=[];
   state.clients.forEach(c=>{
-    if(c.dischargedOn&&c.dischargedOn<=TODAY&&c.loc!=='Discharged'&&c.loc!=='Pending'){const from=c.loc;c.loc='Discharged';c.days=[];c.blocks={};c.plans=[];c.history.push({date:c.dischargedOn,text:`Auto-discharged on date of discharge: ${from} → Discharged`});done.push(`${c.name} → Discharged`)}
+    if(c.dischargedOn&&c.dischargedOn<=TODAY&&c.loc!=='Discharged'&&c.loc!=='Pending'){const from=c.loc;c.lastLoc=from;c.loc='Discharged';c.days=[];c.blocks={};c.plans=[];c.history.push({date:c.dischargedOn,text:`Auto-discharged on date of discharge: ${from} → Discharged`});done.push(`${c.name} → Discharged`)}
     c.plans=(c.plans||[]).filter(p=>p.date&&p.loc).sort((a,b)=>a.date.localeCompare(b.date));
     while(c.plans.length&&c.plans[0].date<=TODAY){
       const p=c.plans.shift(), from=c.loc;
@@ -605,7 +608,7 @@ function cell(c,k){
   switch(k){
     case 'name':return `<td class="nm"><button class="linkish" data-open="${c.id}">${esc(c.name)}</button></td>`;
     case 'alert':{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return `<td>${f.length?`<span class="flag ${f[0].lvl}">${esc(f[0].text)}${f.length>1?` +${f.length-1}`:''}</span>`:''}</td>`}
-    case 'loc':return `<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
+    case 'loc':return c.loc==='Discharged'?`<td><span class="loc-sel static">Discharged</span>${c.lastLoc?`<span class="of"> from ${c.lastLoc}</span>`:''}</td>`:`<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
     case 'housing':return `<td><select class="h-sel ${c.housing==='LPD'?'lpd':''}" data-row-house="${c.id}" aria-label="Housing for ${esc(c.name)}"><option ${c.housing==='LPD'?'selected':''}>LPD</option><option ${c.housing!=='LPD'?'selected':''}>Commuter</option></select></td>`;
     case 'admitDate':return `<td class="mono">${fmt(c.admitDate)}</td>`;
     case 'los':return `<td class="mono">${losDays(c)?losDays(c)+(c.commitDays?`<span class="of">/${c.commitDays}</span>`:''):'—'}</td>`;
@@ -709,7 +712,7 @@ function renderDrawer(){
       <div class="summary">${fl.map(f=>`<span class="flag ${f.lvl}">${esc(f.text)}</span>`).join('')}${los?`<span class="flag info">Day ${los}${c.commitDays?` of ${c.commitDays}`:''}</span>`:''}</div>
       <div class="grid2">
         <div class="fld full"><label for="d-name">Client name</label><input id="d-name" data-f="name" value="${esc(c.name)}"></div>
-        <div class="fld"><label for="d-loc">Level of care</label><select id="d-loc" data-loc-select>${LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></div>
+        <div class="fld"><label for="d-loc">Level of care</label>${c.loc==='Discharged'?`<input id="d-loc" value="Discharged${c.lastLoc?` (from ${c.lastLoc})`:''}" disabled><span class="help">Clear the date of discharge to return the client to the census.</span>`:`<select id="d-loc" data-loc-select>${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select>`}</div>
         <div class="fld"><span class="lbl">Housing</span><div class="seg">${['LPD','Commuter'].map(h=>`<button type="button" data-house="${h}" aria-pressed="${c.housing===h}">${h}</button>`).join('')}</div></div>
         <div class="fld"><label for="d-admit">Admission date</label><input id="d-admit" type="date" data-f="admitDate" value="${c.admitDate}"></div>
         <div class="fld"><span class="lbl">Projected step-down</span>${c.loc==='Discharged'?'<span class="of">n/a</span>':`<button type="button" class="plan-link boxed" data-plan="${c.id}">${nextPlan(c)?`${fmt(nextPlan(c).date)} → ${nextPlan(c).loc}${c.plans.length>1?` (+${c.plans.length-1})`:''}`:'+ Schedule a change'}</button>`}</div>
@@ -749,7 +752,8 @@ function setField(c,f,v){
   if(f==='name'&&!v.trim())return;
   if(f==='dischargedOn'){
     snap();
-    if(v&&v<=TODAY&&c.loc!=='Discharged'){const from=c.loc;c.loc='Discharged';c.days=[];c.blocks={};c.plans=[];c.history.push({date:v,text:`${from} → Discharged`})}
+    if(v&&v<=TODAY&&c.loc!=='Discharged'){const from=c.loc;c.lastLoc=from;c.loc='Discharged';c.days=[];c.blocks={};c.plans=[];c.history.push({date:v,text:`${from} → Discharged`})}
+    if(!v&&c.loc==='Discharged'){const back=c.lastLoc||'Pending';c.loc=back;setSched(c,DEFAULT_DAYS[back]||[],{});c.dcType='';c.dcCompleted='';c.dcLonger='';c.history.push({date:TODAY,text:`Date of discharge cleared: back to ${back}`})}
     if(v)c.history.push({date:TODAY,text:`Date of discharge set to ${fmt(v)}`});
   }
   c[f]=v;
@@ -845,7 +849,7 @@ function renderPlanner(){
     ${planDraft.map((p,i)=>`<fieldset class="slot" style="--c:${p.loc?cvar(p.loc):'var(--accent)'}"><legend>Change ${i+1}</legend>
       <div class="slot-g">
         <div class="fld"><label for="p${i}-date">On this date</label><input type="date" id="p${i}-date" data-p="${i}" data-pf="date" value="${p.date}"></div>
-        <div class="fld"><label for="p${i}-loc">Change LOC to</label><select id="p${i}-loc" data-p="${i}" data-pf="loc"><option value="">Choose…</option>${[...LEVELS,'Discharged'].map(l=>`<option value="${l}" ${p.loc===l?'selected':''}>${l}</option>`).join('')}</select></div>
+        <div class="fld"><label for="p${i}-loc">Change LOC to</label><select id="p${i}-loc" data-p="${i}" data-pf="loc"><option value="">Choose…</option>${LEVELS.map(l=>`<option value="${l}" ${p.loc===l?'selected':''}>${l}</option>`).join('')}</select></div>
       </div>
       ${p.loc&&p.loc!=='Discharged'?pickerHTML(i,p):''}
       ${p.date||p.loc?`<div><button type="button" class="btn small" data-pclear="${i}">Clear this change</button></div>`:''}
@@ -861,7 +865,7 @@ function savePlanner(){
   const used=planDraft.filter(p=>p.date||p.loc);
   const bad=m=>{$('#plan-err').textContent=m};
   if(used.some(p=>!p.date||!p.loc))return bad('Each change needs both a date and a new LOC. Clear any change you don\'t need.');
-  if(used.some(p=>p.loc!=='Discharged'&&!p.days.length))return bad('Pick at least one day for each change that isn\'t a discharge.');
+  if(used.some(p=>p.loc!=='Discharged'&&!p.days.length))return bad('Pick at least one day for each change.');
   if(used.some(p=>p.date<TODAY))return bad('Dates must be today or later.');
   const dates=used.map(p=>p.date);if(new Set(dates).size!==dates.length)return bad('Two changes have the same date. Give each its own date.');
   snap();
@@ -1087,7 +1091,7 @@ function previewRows(rows){
     const loc=parseLoc(g('loc'),g('freq'))||'Pending';
     const cm=parseCommit(g('commit'));
     const name=String(g('name')||'').trim();if(!name)return null;
-    const sd=parseDate(g('stepDown')), to=NEXT_LOC[loc];
+    const sd=parseDate(g('stepDown')), to=NEXT_LOC[loc]==='Discharged'?null:NEXT_LOC[loc];
     const plans=sd&&to&&loc!=='Discharged'?[{date:sd,loc:to,days:[...(DEFAULT_DAYS[to]||[])]}]:[];
     const st=String(g('days')).toLowerCase(), hint=/6\s*-\s*9|eve|night/.test(st)?'EVE':/12:30|after|pm/.test(st)?'PM':'AM';
     const dd=LEVELS.includes(loc)?parseDays(g('days'),loc):[];
