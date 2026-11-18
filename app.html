@@ -71,6 +71,29 @@ button.stat{font:inherit;color:inherit;text-align:left;cursor:pointer}
 button.stat:hover{border-color:var(--muted)}
 button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 15%,transparent)}
 .navgrp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.wk-btn{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--accent);color:var(--accent-ink);border-radius:9px;padding:7px 11px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
+.wk-btn b{min-width:20px;padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--accent-ink) 22%,transparent);font-size:12px;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
+.wk-btn:hover{filter:brightness(1.08)}
+.wk-btn[aria-expanded="true"]{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+.pop-sub{margin:0 8px 6px;color:var(--muted);font-size:12px}
+.wkov{width:min(560px,calc(100vw - 32px))}
+.wk-sum{display:flex;flex-wrap:wrap;gap:6px;margin:0 8px 8px}
+.ev{font-size:11px;font-weight:700;padding:1px 7px;border-radius:5px;white-space:nowrap;align-self:center}
+.ev.adm{color:var(--pend);background:color-mix(in srgb,var(--pend) 14%,transparent)}
+.ev.loc{color:var(--iop);background:color-mix(in srgb,var(--iop) 14%,transparent)}
+.ev.dc{color:var(--dc);background:color-mix(in srgb,var(--dc) 16%,transparent)}
+.wk-day{border-top:1px solid var(--line);padding:6px 0 4px}
+.wk-day h3{margin:2px 8px 4px;font-size:13px;font-family:var(--f-display);font-weight:800}
+.wk-day h3 span{color:var(--muted);font-weight:500;font-family:inherit;font-size:12px;margin-left:4px}
+.wk-day.today h3{color:var(--accent)}
+.wk-day.past{opacity:.6}
+.attn-pop.wkov li+li{border-top:0}
+.attn-pop.wkov li button{flex-direction:row;align-items:center;gap:8px;padding:5px 8px;flex-wrap:wrap}
+.wkov .ev{min-width:76px;text-align:center}
+.wkov .an{font-size:13px}
+.wkov .wd{color:var(--muted);font-size:12px;margin-left:auto;text-align:right}
+.attn-pop.wkov .empty{padding:0 8px 4px;font-size:12px}
+@media (max-width:560px){.wk-btn .lbl{display:none}.wkov .ev{min-width:0}}
 .attn-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:9px;padding:6px 10px;font:inherit;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
 .attn-btn b{min-width:20px;padding:0 6px;border-radius:999px;background:var(--sunk);color:var(--muted);font-size:12px;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
 .attn-btn.on{border-color:color-mix(in srgb,var(--crit) 45%,var(--line));color:var(--crit);background:color-mix(in srgb,var(--crit) 7%,var(--surface))}
@@ -354,6 +377,7 @@ table.arch td{white-space:normal}
 "use strict";
 /* ---------- constants ---------- */
 const DAYS=['mon','tue','wed','thu','fri','sat'];
+const DAY_NAME={mon:'Monday',tue:'Tuesday',wed:'Wednesday',thu:'Thursday',fri:'Friday',sat:'Saturday'};
 const DAY_LABEL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat'};
 const DAY_SHORT={mon:'M',tue:'Tu',wed:'W',thu:'Th',fri:'F',sat:'Sa'};
 /* LOC carries the frequency: PC6 = partial care 6 days/wk, IOP4 = IOP 4 days/wk, EIOP = evening IOP. */
@@ -469,7 +493,8 @@ function sample(){
     dischargedOn:r[13]==null?'':addDays(TODAY,r[13]),
     ...(DCX[r[0]]||{dcType:'',dcCompleted:'',dcLonger:''}),
     history:[{date:addDays(TODAY,Math.min(r[2],0)),text:r[1]==='Pending'?'Referral received':'Admitted'}]
-  }}).map(c=>{const b=SB[c.name];c.blocks=normBlocks(c.loc,c.days,typeof b==='string'?uniform(c.days,b):b||{});return c});
+  }}).map(c=>{const b=SB[c.name];c.blocks=normBlocks(c.loc,c.days,typeof b==='string'?uniform(c.days,b):b||{});return c})
+  .map(c=>{if(c.name==='Marcus Lyle')c.psychApn='';if(c.name==='Malik Torrance'){c.referral='';c.caseManager=''}return c});
 }
 
 /* Fictional archived records: discharges and incomplete (failed) admissions. */
@@ -507,23 +532,29 @@ function flags(c){
   const f=[];
   if(c.loc==='Pending'){
     if(c.admitDate){const d=diff(TODAY,c.admitDate);
-      f.push(d<0?{lvl:'crit',text:`Admit date passed ${-d}d ago`}:d===0?{lvl:'warn',text:'Admits today'}:d===1?{lvl:'warn',text:'Admits tomorrow'}:{lvl:'info',text:`Admits ${wkday(c.admitDate)} ${fmt(c.admitDate)}`})}
+      f.push(d<0?{lvl:'crit',text:`Admit date passed ${-d}d ago`}:d===0?{lvl:'info',text:'Admits today'}:d===1?{lvl:'info',text:'Admits tomorrow'}:{lvl:'info',text:`Admits ${wkday(c.admitDate)} ${fmt(c.admitDate)}`})}
     else f.push({lvl:'warn',text:'No admit date'});
+    missingInfo(c,f);
     return f;
   }
   if(dcMissing(c))f.push({lvl:'warn',text:'Discharge details missing'});
   if(c.loc==='Discharged')return f;
   if(c.dischargedOn)f.push({lvl:'info',text:`Discharging ${fmt(c.dischargedOn)}`});
   const np=nextPlan(c);
-  if(np){const d=diff(TODAY,np.date);if(d<=3)f.push({lvl:'warn',text:d<=1?`Moves to ${np.loc} tomorrow`:`Moves to ${np.loc} in ${d}d`})}
+  if(np){const d=diff(TODAY,np.date);if(d<=3)f.push({lvl:'info',text:d<=1?`Moves to ${np.loc} tomorrow`:`Moves to ${np.loc} in ${d}d`})}
   else if(group(c.loc)!=='OP')f.push({lvl:'info',text:'No step-down scheduled'});
   if(c.dcDate){const d=diff(TODAY,c.dcDate);
-    if(d<0)f.push({lvl:'crit',text:`DC ${-d}d overdue`});else if(d<=7)f.push({lvl:'warn',text:d===0?'DC today':`DC in ${d}d`})}
+    if(d<0)f.push({lvl:'crit',text:`DC ${-d}d overdue`});else if(d<=7)f.push({lvl:'info',text:d===0?'DC today':`DC in ${d}d`})}
   if(c.commitDays&&losDays(c)>c.commitDays)f.push({lvl:'warn',text:'Past incoming commitment'});
   if(!c.days.length)f.push({lvl:'warn',text:'No schedule set'});
   else if(EXPECT[c.loc]&&c.days.length!==EXPECT[c.loc])f.push({lvl:'warn',text:`${c.loc} with ${c.days.length} day${c.days.length>1?'s':''} scheduled`});
+  if(!c.dcDate)f.push({lvl:'warn',text:'No projected DC date'});
+  missingInfo(c,f);
   return f;
 }
+/* Profile fields every client card should have filled in */
+const REQUIRED=[['clinician','clinician'],['caseManager','case manager'],['psychApn','psych APN'],['referral','referral source'],['commitDays','incoming commitment'],['housing','housing']];
+function missingInfo(c,f){const m=REQUIRED.filter(([k])=>!c[k]).map(([,l])=>l);if(m.length)f.push({lvl:'warn',text:`Missing ${m.join(', ')}`})}
 const sev={crit:0,warn:1,info:2};
 
 /* ---------- filters ---------- */
@@ -603,7 +634,7 @@ function runScheduled(){
 const $=s=>document.querySelector(s);
 let view='census', sort={k:'loc',dir:1}, openId=null;
 
-let attnOpen=false;
+let pop=null; // 'attn' | 'week' | null
 function renderStats(){
   const act=state.clients.filter(c=>LEVELS.includes(c.loc));
   const n=l=>state.clients.filter(c=>group(c.loc)===l).length;
@@ -619,8 +650,9 @@ function renderStats(){
     `<div class="stat"><div class="k">Housing</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
     st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
     '';
-  $('#attn-slot').innerHTML=`<button type="button" class="attn-btn ${attn?'on':''}" data-attn aria-expanded="${attnOpen}" aria-controls="attn-pop" title="Needs attention"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg><span class="lbl">Needs attention</span><b>${attn}</b></button>`+
-    (attnOpen?'<div class="attn-scrim"></div>'+renderAttention(state.clients):'');
+  const wk=weekEvents(), wkLeft=wk.days.reduce((n,d)=>n+(d.date>=TODAY?d.ev.length:0),0);
+  $('#attn-slot').innerHTML=`<button type="button" class="wk-btn" data-pop="week" aria-expanded="${pop==='week'}" title="Admissions, LOC changes and discharges this week"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2Zm-2 8h14v10H5Z" fill="currentColor"/></svg><span class="lbl">Week overview</span><b>${wkLeft}</b></button><button type="button" class="attn-btn ${attn?'on':''}" data-pop="attn" aria-expanded="${pop==='attn'}" title="Needs attention"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg><span class="lbl">Needs attention</span><b>${attn}</b></button>`+
+    (pop?'<div class="attn-scrim"></div>'+(pop==='attn'?renderAttention(state.clients):renderWeekOverview(wk)):'');
 }
 function renderStaffFilter(){
   const sel=$('#f-staff'), cur=F.staff;
@@ -635,7 +667,32 @@ function daysDots(c){return `<span class="days" style="--c:${cvar(c.loc)}">${DAY
 function renderAttention(list){
   const items=list.filter(recentDc).map(c=>({c,fs:flags(c).filter(f=>f.lvl!=='info').sort((a,b)=>sev[a.lvl]-sev[b.lvl])})).filter(x=>x.fs.length);
   items.sort((a,b)=>sev[a.fs[0].lvl]-sev[b.fs[0].lvl]||a.c.name.localeCompare(b.c.name));
-  return `<div class="attn-pop" id="attn-pop" role="dialog" aria-label="Needs attention"><h2>Needs attention<button type="button" data-attn aria-label="Close">×</button></h2>${items.length?`<ul>${items.map(({c,fs})=>`<li><button data-open="${c.id}"><span class="an">${esc(c.name)} <span>· ${c.loc}</span></span>${fs.map(f=>`<span class="flag ${f.lvl}" style="padding:0;background:none">${esc(f.text)}</span>`).join('')}</button></li>`).join('')}</ul>`:'<p class="empty">Nothing due in the next few days.</p>'}</div>`;
+  return `<div class="attn-pop" id="attn-pop" role="dialog" aria-label="Needs attention"><h2>Needs attention<button type="button" data-pop="attn" aria-label="Close">×</button></h2><p class="pop-sub">Missing or out-of-date information to fix. Upcoming admits, step-downs and discharges are in Week overview.</p>${items.length?`<ul>${items.map(({c,fs})=>`<li><button data-open="${c.id}"><span class="an">${esc(c.name)} <span>· ${c.loc}</span></span>${fs.map(f=>`<span class="flag ${f.lvl}" style="padding:0;background:none">${esc(f.text)}</span>`).join('')}</button></li>`).join('')}</ul>`:'<p class="empty">Nothing needs attention. Every client card is complete.</p>'}</div>`;
+}
+/* Week overview: admissions, LOC changes and discharges for the calendar week Mon–Sat (on Sunday, the coming week) */
+function weekEvents(){
+  const d0=pISO(TODAY), dow=(d0.getDay()+6)%7;
+  const mon=dow===6?addDays(TODAY,1):addDays(TODAY,-dow), sat=addDays(mon,5);
+  const days=DAYS.map((k,i)=>({k,date:addDays(mon,i),ev:[]}));
+  const at=(date,e)=>{const d=days.find(x=>x.date===date);if(d)d.ev.push(e)};
+  state.clients.forEach(c=>{
+    if(c.admitDate&&c.admitDate>=mon&&c.admitDate<=sat){const first=(c.plans||[])[0];at(c.admitDate,{t:'adm',c,txt:c.loc==='Pending'?(first?`Admits to ${first.loc}`:'Pending admit'):`Admitted to ${c.loc}`})}
+    let from=c.loc;
+    (c.plans||[]).forEach(p=>{if(p.date>=mon&&p.date<=sat&&from!=='Pending')at(p.date,{t:'loc',c,txt:`${from} → ${p.loc}`});from=p.loc});
+    (c.history||[]).forEach(h=>{const m=/^Auto-updated per schedule: (\S+) → (\S+)/.exec(h.text);if(m&&m[2]!=='Discharged'&&h.date>=mon&&h.date<=sat)at(h.date,{t:'loc',c,txt:`${m[1]} → ${m[2]}`})});
+    if(c.dischargedOn){if(c.dischargedOn>=mon&&c.dischargedOn<=sat)at(c.dischargedOn,{t:'dc',c,txt:c.loc==='Discharged'?'Discharged':'Discharge date set'})}
+    else if(LEVELS.includes(c.loc)&&c.dcDate>=mon&&c.dcDate<=sat)at(c.dcDate,{t:'dc',c,txt:c.dcDate<TODAY?'Projected DC · not yet discharged':'Projected DC'});
+  });
+  const ord={adm:0,loc:1,dc:2};days.forEach(d=>d.ev.sort((a,b)=>ord[a.t]-ord[b.t]||a.c.name.localeCompare(b.c.name)));
+  return {mon,sat,days};
+}
+function renderWeekOverview(wk){
+  const tot=t=>wk.days.reduce((n,d)=>n+d.ev.filter(e=>e.t===t).length,0);
+  const TL={adm:'Admit',loc:'LOC change',dc:'Discharge'};
+  return `<div class="attn-pop wkov" id="attn-pop" role="dialog" aria-label="Week overview"><h2>Week overview · ${fmt(wk.mon)}–${fmt(wk.sat)}<button type="button" data-pop="week" aria-label="Close">×</button></h2>
+  <div class="wk-sum"><span class="ev adm">${tot('adm')} admits</span><span class="ev loc">${tot('loc')} LOC changes</span><span class="ev dc">${tot('dc')} discharges</span></div>
+  ${wk.days.map(d=>`<section class="wk-day ${d.date<TODAY?'past':''} ${d.date===TODAY?'today':''}"><h3>${DAY_NAME[d.k]} <span>${fmt(d.date)}${d.date===TODAY?' · today':''}</span></h3>${d.ev.length?`<ul>${d.ev.map(e=>`<li><button data-open="${e.c.id}"><span class="ev ${e.t}">${TL[e.t]}</span><span class="an">${esc(e.c.name)}</span><span class="wd">${esc(e.txt)}</span></button></li>`).join('')}</ul>`:'<p class="empty">Nothing scheduled</p>'}</section>`).join('')}
+  </div>`;
 }
 /* Week view range: full week = Mon–Sat; 3-day = the next 3 program days from today (Sundays skipped). Arrows shift the range. */
 let weekMode=(()=>{try{return localStorage.getItem('census-weekmode')||'full'}catch(e){return 'full'}})(), weekShift=0;
@@ -986,9 +1043,8 @@ document.addEventListener('click',e=>{
   if(suppressClick){suppressClick=false;e.preventDefault();return}
   const t=e.target;
   if(t.closest('select'))return;
-  if(t.closest('[data-attn]')){attnOpen=!attnOpen;renderStats();return}
-  if(attnOpen&&!t.closest('#attn-pop')){attnOpen=false;renderStats()}
-  if(attnOpen&&t.closest('#attn-pop [data-open]')){attnOpen=false;renderStats()}
+  const pb=t.closest('[data-pop]');if(pb){pop=pop===pb.dataset.pop?null:pb.dataset.pop;renderStats();return}
+  if(pop&&(!t.closest('#attn-pop')||t.closest('#attn-pop [data-open]'))){pop=null;renderStats()}
   const c=byId(openId);
   const lf=t.closest('[data-locf]');if(lf){F.loc=lf.dataset.locf;render();return}
   if(t.closest('[data-close]')){closeLayerOrPlanner();return}
@@ -1026,7 +1082,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&$('#confirm-slot').innerHTML){closeConfirm();return}
-  if(e.key==='Escape'&&attnOpen){attnOpen=false;renderStats();return}
+  if(e.key==='Escape'&&pop){pop=null;renderStats();return}
   if(e.key==='Escape'&&$('#layer').innerHTML)closeLayerOrPlanner();
   if((e.key==='Enter'||e.key===' ')&&e.target.matches('.card')){e.preventDefault();openClient(e.target.dataset.id)}
 });
