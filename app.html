@@ -607,7 +607,7 @@ function renderStats(){
   $('#stats').innerHTML=
     `<div class="stat wide"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${GROUPS.map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
     `<div class="stat"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${admToday}</div><div class="s">admits today</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DCs today</div></div></div></div>`+
-    st('LPD',lpd,`${act.length-lpd} commuters`)+
+    `<div class="stat"><div class="k">Housing</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
     st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
     `<button type="button" class="stat ${attn?'alert':''}" data-attn aria-expanded="${attnOpen}" aria-controls="attn-pop"><div class="k">Needs attention</div><div class="v">${attn}</div><div class="s">${attnOpen?'click to close':'click to see list'}</div></button>`+
     (attnOpen?'<div class="attn-scrim"></div>'+renderAttention(state.clients):'');
