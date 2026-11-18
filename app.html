@@ -199,6 +199,13 @@ table.census tr.dc td{color:var(--muted)}
 .bopts button.off[aria-pressed="true"]{background:var(--sunk);border-color:var(--line);color:var(--ink)}
 .toast button+button{margin-left:-4px}
 
+/* Discharge */
+.dcbox{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.dcbox.need{border-color:color-mix(in srgb,var(--warn) 55%,var(--line));background:color-mix(in srgb,var(--warn) 6%,transparent)}
+.dcbox .full{grid-column:1/-1;margin:0}
+.dcbox .help{font-size:12px;color:var(--muted)}
+.req{text-transform:none;letter-spacing:0;color:var(--warn);font-weight:600;margin-left:4px}
+
 /* Drawer */
 .scrim{position:fixed;inset:0;background:rgba(10,18,22,.35);z-index:40}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);z-index:50;box-shadow:-8px 0 30px rgba(0,0,0,.18);display:flex;flex-direction:column;
@@ -300,7 +307,10 @@ const M6=['mon','tue','wed','thu','fri','sat'],M5=['mon','tue','wed','thu','fri'
 const DEFAULT_DAYS={Pending:[],PC6:M6,PC5:M5,IOP6:M6,IOP5:M5,IOP4:['mon','tue','wed','thu'],IOP3:['mon','tue','thu'],EIOP:['mon','tue','thu'],OP:['tue'],Discharged:[]};
 const DEFAULT_LOS={PHP:21,IOP:28};
 const OP_TO_DC=42;
-const KEY='census-prototype-v5';
+const KEY='census-prototype-v6';
+/* Sample discharge types until the program's real list is provided. */
+const DC_TYPES=['Completed treatment','Stepped down to outside provider','Transferred to higher level of care','Left against clinical advice','Administrative discharge','Lost contact / non-attendance','Insurance / financial'];
+const dcMissing=c=>c.dischargedOn&&(!c.dcType||!c.dcCompleted||!c.dcLonger);
 /* Projected DC from incoming commitment: admission date is day 1, so the last day is admit + LOS - 1.
    A Saturday moves back to Friday; a Sunday moves forward to Monday. */
 function calcDc(admit,los){
@@ -377,6 +387,7 @@ function sample(){
     ['Quinn Albright','Discharged',-40,null,-14,'',0,2,0,'Self-referral',42,'IOP 6 wks','Commuter',-14],
   ];
   const SB={'Samir Haddock':'PM','Devon Pierce':'AM','Hannah Osei':{mon:'AM',tue:'AM',wed:'PM',thu:'PM'},'Rosa Delgado':{tue:'AM',wed:'PM',fri:'AM'},'Wyatt Ferris':'PM','Casey Holloway':'AM','Nadia Vance':'EVE','Oliver Grant':'PM','Simone Achebe':'EVE','Ben Okonkwo':'AM'};
+  const DCX={'Riley Starr':{dcType:'Completed treatment',dcCompleted:'Yes',dcLonger:'Yes'},'Frances Iwu':{dcType:'Stepped down to outside provider',dcCompleted:'No',dcLonger:'No'}};
   const FIRST={'Elena Ruiz':'PC5','Casey Holloway':'IOP5','Noah Brandt':'EIOP','Grace Whitfield':'IOP5'};
   const LATER={'Avery Mendez':[['IOP3',17],['OP',31]],'Imani Clarke':[['IOP3',23],['OP',37]],'Elena Ruiz':[['IOP5',31],['IOP3',45]],'Devon Pierce':[['OP',24]]};
   return rows.map((r,i)=>{
@@ -389,6 +400,7 @@ function sample(){
     days:D(r[5]), clinician:CLIN[r[6]], caseManager:CM[r[7]], psychApn:APN[r[8]],
     referral:r[9], commitDays:r[10], commitNote:r[11], housing:r[12],
     dischargedOn:r[13]==null?'':addDays(TODAY,r[13]),
+    ...(DCX[r[0]]||{dcType:'',dcCompleted:'',dcLonger:''}),
     history:[{date:addDays(TODAY,Math.min(r[2],0)),text:r[1]==='Pending'?'Referral received':'Admitted'}]
   }}).map(c=>{const b=SB[c.name];c.blocks=normBlocks(c.loc,c.days,typeof b==='string'?uniform(c.days,b):b||{});return c});
 }
@@ -413,7 +425,9 @@ function flags(c){
     else f.push({lvl:'warn',text:'No admit date'});
     return f;
   }
+  if(dcMissing(c))f.push({lvl:'warn',text:'Discharge details missing'});
   if(c.loc==='Discharged')return f;
+  if(c.dischargedOn)f.push({lvl:'info',text:`Discharging ${fmt(c.dischargedOn)}`});
   const np=nextPlan(c);
   if(np){const d=diff(TODAY,np.date);if(d<=3)f.push({lvl:'warn',text:d<=1?`Moves to ${np.loc} tomorrow`:`Moves to ${np.loc} in ${d}d`})}
   else if(group(c.loc)!=='OP')f.push({lvl:'info',text:'No step-down scheduled'});
@@ -448,9 +462,9 @@ function moveLoc(id,to){
     c.dischargedOn=TODAY;c.days=[];c.blocks={};c.plans=[];
     msg.push('Discharge date set to today.');
   }else if(to==='Pending'){
-    c.days=[];c.blocks={};c.dischargedOn='';
+    c.days=[];c.blocks={};c.dischargedOn='';c.dcType='';c.dcCompleted='';c.dcLonger='';
   }else{
-    if(from==='Pending'||from==='Discharged'){if(!c.admitDate||c.admitDate>TODAY||from==='Discharged')c.admitDate=TODAY;c.dischargedOn=''}
+    if(from==='Pending'||from==='Discharged'){if(!c.admitDate||c.admitDate>TODAY||from==='Discharged')c.admitDate=TODAY;c.dischargedOn='';c.dcType='';c.dcCompleted='';c.dcLonger=''}
     const prevB=Object.values(c.blocks||{})[0];
     setSched(c,DEFAULT_DAYS[to],uniform(DEFAULT_DAYS[to],to==='EIOP'?'EVE':prevB));
     msg.push(`Schedule set to ${schedSummary(c)}.`);
@@ -479,13 +493,14 @@ function moveSlot(id,fromDay,toDay,toBlock){
 function runScheduled(){
   const done=[];
   state.clients.forEach(c=>{
+    if(c.dischargedOn&&c.dischargedOn<=TODAY&&c.loc!=='Discharged'&&c.loc!=='Pending'){const from=c.loc;c.loc='Discharged';c.days=[];c.blocks={};c.plans=[];c.history.push({date:c.dischargedOn,text:`Auto-discharged on date of discharge: ${from} → Discharged`});done.push(`${c.name} → Discharged`)}
     c.plans=(c.plans||[]).filter(p=>p.date&&p.loc).sort((a,b)=>a.date.localeCompare(b.date));
     while(c.plans.length&&c.plans[0].date<=TODAY){
       const p=c.plans.shift(), from=c.loc;
       c.loc=p.loc;
       if(p.loc==='Discharged'){c.dischargedOn=p.date;c.days=[];c.blocks={};c.plans=[]}
       else{
-        if(from==='Pending'||from==='Discharged'){c.admitDate=p.date;c.dischargedOn=''}
+        if(from==='Pending'||from==='Discharged'){c.admitDate=p.date;c.dischargedOn='';c.dcType='';c.dcCompleted='';c.dcLonger=''}
         setSched(c,p.days&&p.days.length?p.days:DEFAULT_DAYS[p.loc],p.blocks||{});
         if(p.loc==='OP'&&(!c.dcDate||c.dcDate<p.date))c.dcDate=addDays(p.date,OP_TO_DC);
       }
@@ -620,7 +635,6 @@ function renderDrawer(){
         <div class="fld"><label for="d-admit">Admission date</label><input id="d-admit" type="date" data-f="admitDate" value="${c.admitDate}"></div>
         <div class="fld"><span class="lbl">Projected step-down</span>${c.loc==='Discharged'?'<span class="of">n/a</span>':`<button type="button" class="plan-link boxed" data-plan="${c.id}">${nextPlan(c)?`${fmt(nextPlan(c).date)} → ${nextPlan(c).loc}${c.plans.length>1?` (+${c.plans.length-1})`:''}`:'+ Schedule a change'}</button>`}</div>
         <div class="fld"><label for="d-dc">Projected DC</label><input id="d-dc" type="date" data-f="dcDate" value="${c.dcDate}"><span class="help">Set from admission + LOS, kept off weekends. You can change it.</span></div>
-        ${c.loc==='Discharged'?`<div class="fld"><label for="d-dco">Discharged on</label><input id="d-dco" type="date" data-f="dischargedOn" value="${c.dischargedOn}"></div>`:''}
         ${LEVELS.includes(c.loc)?`<div class="fld full"><span class="lbl">Schedule · ${freq(c)}</span><button type="button" class="plan-link boxed" data-sched="${c.id}">${schedHTML(c)||'+ Set days and times'}</button></div>`:''}
       </div>
       <div class="sec-h">Care team</div>
@@ -635,6 +649,15 @@ function renderDrawer(){
         <div class="fld"><label for="d-cd">Length of stay (days)</label><input id="d-cd" type="number" min="0" data-f="commitDays" value="${c.commitDays||''}"></div>
         <div class="fld"><label for="d-cn">Plan of care</label><input id="d-cn" data-f="commitNote" value="${esc(c.commitNote)}" placeholder="e.g. PHP 3 wks, IOP 4 wks"></div>
       </div>
+      <div class="sec-h">Discharge</div>
+      <div class="grid2 dcbox ${dcMissing(c)?'need':''}">
+        <div class="fld"><label for="d-dco">Date of discharge</label><input id="d-dco" type="date" data-f="dischargedOn" value="${c.dischargedOn||''}"></div>
+        ${c.dischargedOn?`
+        <div class="fld"><label for="d-dct">Discharge type <span class="req">required</span></label><select id="d-dct" data-f="dcType"><option value="">Choose…</option>${DC_TYPES.map(t=>`<option ${c.dcType===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="fld"><span class="lbl">Completed commitment? <span class="req">required</span></span><div class="seg">${['Yes','No'].map(v=>`<button type="button" data-dcq="dcCompleted" data-v="${v}" aria-pressed="${c.dcCompleted===v}">${v}</button>`).join('')}</div></div>
+        <div class="fld"><span class="lbl">Longer than commitment? <span class="req">required</span></span><div class="seg">${['Yes','No'].map(v=>`<button type="button" data-dcq="dcLonger" data-v="${v}" aria-pressed="${c.dcLonger===v}">${v}</button>`).join('')}</div></div>
+        <p class="help full">${c.commitDays&&c.admitDate?`Stay is ${Math.max(1,diff(c.admitDate,c.dischargedOn)+1)} days against a ${c.commitDays}-day commitment.`:'No incoming commitment recorded.'}${dcMissing(c)?' Answer all three to complete the discharge.':''}</p>`:'<p class="help full" style="align-self:end">Entering a date discharges the client on that date.</p>'}
+      </div>
       <div class="sec-h">History</div>
       <ul class="hist">${[...c.history].reverse().map(h=>`<li><span class="mono">${fmt(h.date)}</span><span>${esc(h.text)}</span></li>`).join('')}</ul>
       <div class="confirm">${confirmDel?`Remove ${esc(c.name)} from the census? <button class="btn small danger" data-del-yes>Remove</button><button class="btn small" data-del-no>Cancel</button>`:`<button class="btn small danger" data-del>Remove from census</button>`}</div>
@@ -645,7 +668,13 @@ function renderDrawer(){
 function setField(c,f,v){
   if(f==='commitDays')v=parseInt(v,10)||0;
   if(f==='name'&&!v.trim())return;
+  if(f==='dischargedOn'){
+    snap();
+    if(v&&v<=TODAY&&c.loc!=='Discharged'){const from=c.loc;c.loc='Discharged';c.days=[];c.blocks={};c.plans=[];c.history.push({date:v,text:`${from} → Discharged`})}
+    if(v)c.history.push({date:TODAY,text:`Date of discharge set to ${fmt(v)}`});
+  }
   c[f]=v;
+  if(f==='dcType'&&v)c.history.push({date:TODAY,text:`Discharge type: ${v}`});
   if((f==='commitDays'||f==='admitDate')&&c.loc!=='Discharged'&&c.commitDays&&c.admitDate){c.dcDate=calcDc(c.admitDate,c.commitDays)}
   save();
   const keepFocus=document.activeElement?.id;
@@ -777,6 +806,7 @@ document.addEventListener('click',e=>{
   if(t.closest('[data-pclear]')){const i=+t.closest('[data-pclear]').dataset.pclear;planDraft[i]={date:'',loc:'',days:[],blocks:{}};renderPlanner();return}
   if(t.id==='plan-save'){savePlanner();return}
   if(t.id==='sched-save'){saveSched();return}
+  const q=t.closest('[data-dcq]');if(q&&c){c[q.dataset.dcq]=q.dataset.v;save();render();return}
   const sb=t.closest('[data-sb]');if(sb){const ctx=sb.dataset.ctx;pickerSet(ctx==='edit'?schedDraft:planDraft[+ctx],sb.dataset.sd,sb.dataset.sb);ctx==='edit'?renderSched():renderPlanner();return}
   const sc=t.closest('[data-sched]');if(sc){openSched(sc.dataset.sched);return}
   const opener=t.closest('[data-open],[data-drag]');
@@ -865,9 +895,9 @@ document.addEventListener('contextmenu',e=>{if(drag&&drag.touch)e.preventDefault
 
 /* ---------- CSV export ---------- */
 function toCsv(){
-  const head=['Client name','Admission date','Projected step-down date','Next LOC','Projected DC date','LOC','Attendance days','Clinician','Case manager','Psych APN','Referral source','Incoming commitment','Commitment days','Housing'];
+  const head=['Client name','Admission date','Projected step-down date','Next LOC','Projected DC date','LOC','Attendance days','Clinician','Case manager','Psych APN','Referral source','Incoming commitment','Commitment days','Housing','Date of discharge','Discharge type','Completed commitment?','Longer than commitment?'];
   const q=v=>{v=String(v??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
-  const rows=state.clients.map(c=>[c.name,fmt(c.admitDate).replace('—',''),nextPlan(c)?fmt(nextPlan(c).date):'',nextPlan(c)?.loc||'',fmt(c.dcDate).replace('—',''),c.loc,schedSummary(c),c.clinician,c.caseManager,c.psychApn,c.referral,c.commitNote,c.commitDays||'',c.housing]);
+  const rows=state.clients.map(c=>[c.name,fmt(c.admitDate).replace('—',''),nextPlan(c)?fmt(nextPlan(c).date):'',nextPlan(c)?.loc||'',fmt(c.dcDate).replace('—',''),c.loc,schedSummary(c),c.clinician,c.caseManager,c.psychApn,c.referral,c.commitNote,c.commitDays||'',c.housing,c.dischargedOn?fmt(c.dischargedOn):'',c.dcType||'',c.dcCompleted||'',c.dcLonger||'']);
   return [head,...rows].map(r=>r.map(q).join(',')).join('\n');
 }
 function copyCsv(btn){
