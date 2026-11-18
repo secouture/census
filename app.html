@@ -8,9 +8,9 @@
    (Board by level of care, Week schedule, or Spreadsheet table) with a slide-in client drawer. */
 :root{
   --bg:#f3f6f7; --surface:#ffffff; --sunk:#e9eef0; --ink:#16232a; --muted:#5a6a73; --line:#d7dfe3;
-  --accent:#2c6b70; --accent-ink:#ffffff;
+  --accent:#2563a6; --accent-ink:#ffffff;
   --pend:#a86a12; --php:#5946b2; --iop:#16788a; --op:#3a8549; --eiop:#3d5a9e; --dc:#76858d;
-  --warn:#a85a06; --crit:#b3261e; --info:#2c6b70;
+  --warn:#a85a06; --crit:#b3261e; --info:#2563a6;
   --shadow:0 1px 2px rgba(22,35,42,.06),0 4px 14px rgba(22,35,42,.06);
   --f-display:"Manrope",ui-sans-serif,system-ui,sans-serif;
   --f-body:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -18,15 +18,15 @@
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0e161a; --surface:#152127; --sunk:#1b2a31; --ink:#e3ebee; --muted:#97a9b2; --line:#26363e;
-  --accent:#72b6b9; --accent-ink:#0e161a;
+  --accent:#86b4ec; --accent-ink:#0e161a;
   --pend:#e0ad5c; --php:#ab9ff2; --iop:#5ec5d8; --op:#7fcc90; --eiop:#8fb0f0; --dc:#8d9ba2;
-  --warn:#f0a44c; --crit:#f2776c; --info:#72b6b9;
+  --warn:#f0a44c; --crit:#f2776c; --info:#86b4ec;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0e161a; --surface:#152127; --sunk:#1b2a31; --ink:#e3ebee; --muted:#97a9b2; --line:#26363e;
-  --accent:#72b6b9; --accent-ink:#0e161a;
+  --accent:#86b4ec; --accent-ink:#0e161a;
   --pend:#e0ad5c; --php:#ab9ff2; --iop:#5ec5d8; --op:#7fcc90; --eiop:#8fb0f0; --dc:#8d9ba2;
-  --warn:#f0a44c; --crit:#f2776c; --info:#72b6b9;
+  --warn:#f0a44c; --crit:#f2776c; --info:#86b4ec;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}
 
 *{box-sizing:border-box}
@@ -57,8 +57,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .prog-menu button[aria-checked="true"]{background:var(--sunk)}
 .prog-menu button[aria-checked="true"]::after{content:"✓";margin-left:auto;color:var(--muted)}
 .pm-dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:800;font-size:10px}
-.pm-dot.sud{background:#2c6b70}.pm-dot.mh{background:#6a4bb0}
-:root{--prog:#2c6b70}
+.pm-dot.sud{background:#2563a6}.pm-dot.mh{background:#6a4bb0}
+:root{--prog:#2563a6}
 body.prog-mh{--prog:#6a4bb0}
 /* Each program gets a slightly different page tint */
 body{background:color-mix(in srgb,var(--prog) 6%,var(--bg))}
