@@ -70,7 +70,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 button.stat{font:inherit;color:inherit;text-align:left;cursor:pointer}
 button.stat:hover{border-color:var(--muted)}
 button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 15%,transparent)}
-.attn-pop{position:absolute;top:calc(100% + 6px);right:0;z-index:40;width:min(440px,100%);max-height:min(60vh,480px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px}
+.attn-scrim{position:fixed;inset:0;z-index:39;background:rgba(15,20,25,.28)}
+.attn-pop{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:40;width:min(480px,calc(100vw - 32px));max-height:min(70vh,560px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px}
 .attn-pop h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:6px 8px 6px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
 .attn-pop h2 button{border:0;background:none;color:var(--muted);font-size:18px;line-height:1;padding:0 4px;cursor:pointer}
 .attn-pop ul{list-style:none;margin:0;padding:0}
@@ -610,7 +611,7 @@ function renderStats(){
     st('LPD',lpd,`${act.length-lpd} commuters`)+
     st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
     `<button type="button" class="stat ${attn?'alert':''}" data-attn aria-expanded="${attnOpen}" aria-controls="attn-pop"><div class="k">Needs attention</div><div class="v">${attn}</div><div class="s">${attnOpen?'click to close':'click to see list'}</div></button>`+
-    (attnOpen?renderAttention(state.clients):'');
+    (attnOpen?'<div class="attn-scrim"></div>'+renderAttention(state.clients):'');
 }
 function renderStaffFilter(){
   const sel=$('#f-staff'), cur=F.staff;
