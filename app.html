@@ -1,0 +1,803 @@
+<title>Census Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout: a clinical operations board. Header + census numbers, then one working view
+   (Board by level of care, Week schedule, or Spreadsheet table) with a slide-in client drawer. */
+:root{
+  --bg:#f3f6f7; --surface:#ffffff; --sunk:#e9eef0; --ink:#16232a; --muted:#5a6a73; --line:#d7dfe3;
+  --accent:#2c6b70; --accent-ink:#ffffff;
+  --pend:#a86a12; --php:#5946b2; --iop:#16788a; --op:#3a8549; --dc:#76858d;
+  --warn:#a85a06; --crit:#b3261e; --info:#2c6b70;
+  --shadow:0 1px 2px rgba(22,35,42,.06),0 4px 14px rgba(22,35,42,.06);
+  --f-display:"Manrope",ui-sans-serif,system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e161a; --surface:#152127; --sunk:#1b2a31; --ink:#e3ebee; --muted:#97a9b2; --line:#26363e;
+  --accent:#72b6b9; --accent-ink:#0e161a;
+  --pend:#e0ad5c; --php:#ab9ff2; --iop:#5ec5d8; --op:#7fcc90; --dc:#8d9ba2;
+  --warn:#f0a44c; --crit:#f2776c; --info:#72b6b9;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e161a; --surface:#152127; --sunk:#1b2a31; --ink:#e3ebee; --muted:#97a9b2; --line:#26363e;
+  --accent:#72b6b9; --accent-ink:#0e161a;
+  --pend:#e0ad5c; --php:#ab9ff2; --iop:#5ec5d8; --op:#7fcc90; --dc:#8d9ba2;
+  --warn:#f0a44c; --crit:#f2776c; --info:#72b6b9;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1440px;margin:0 auto}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+.notice{margin:12px 0 0;padding:8px 12px;border:1px dashed var(--line);border-radius:8px;color:var(--muted);font-size:12.5px;background:var(--surface)}
+.notice b{color:var(--ink)}
+
+header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-block:18px 10px}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand h1{font-family:var(--f-display);font-weight:800;font-size:24px;letter-spacing:-.02em;margin:0}
+.brand .date{color:var(--muted);font-size:13px}
+.tabs{display:flex;gap:2px;background:var(--sunk);padding:3px;border-radius:9px}
+.tabs a{padding:6px 14px;border-radius:7px;text-decoration:none;color:var(--muted);font-weight:600;font-size:13px}
+.tabs a[aria-current="page"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.btn{border:1px solid var(--line);background:var(--surface);padding:7px 12px;border-radius:8px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,var(--line))}
+.btn.small{padding:4px 9px;font-size:12px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;margin:8px 0 14px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
+.stat .v{font-family:var(--f-display);font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.stat .s{font-size:12px;color:var(--muted)}
+.stat.alert .v{color:var(--crit)}
+.swatch{width:8px;height:8px;border-radius:2px;display:inline-block}
+
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.filters input,.filters select{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 10px;min-width:0}
+.filters input{flex:1 1 200px;max-width:320px}
+.filters .spacer{flex:1}
+
+/* Attention strip */
+.attn{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:14px}
+.attn h2{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 8px;font-weight:600}
+.attn ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.attn li button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:4px 10px 4px 8px;font-size:12.5px;display:flex;gap:6px;align-items:center}
+.attn .empty{color:var(--muted);font-size:13px}
+
+/* Board */
+.board{display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:12px;overflow-x:auto;padding-bottom:6px}
+.col{background:var(--sunk);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:180px;border:2px solid transparent;transition:border-color .12s,background .12s}
+.col.over{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,var(--sunk))}
+.col-h{display:flex;align-items:baseline;gap:8px;padding:2px 4px 4px;border-bottom:3px solid var(--c)}
+.col-h h3{margin:0;font-family:var(--f-display);font-size:16px;font-weight:800;color:var(--c)}
+.col-h .n{font-family:var(--f-display);font-weight:700;font-size:16px}
+.col-h .sub{font-size:11.5px;color:var(--muted);margin-left:auto;text-align:right}
+.col .hint{font-size:12px;color:var(--muted);text-align:center;padding:16px 6px;border:1px dashed var(--line);border-radius:8px}
+
+.card{background:var(--surface);border-radius:9px;padding:9px 10px;box-shadow:var(--shadow);border-left:4px solid var(--c);cursor:grab;user-select:none;-webkit-user-select:none;display:flex;flex-direction:column;gap:5px;touch-action:manipulation}
+.card:hover{box-shadow:0 0 0 1px var(--line),var(--shadow)}
+.card.dragging{opacity:.35}
+.card-top{display:flex;align-items:center;gap:6px}
+.card .name{font-weight:600;font-size:14px}
+.tag{font-size:10.5px;font-weight:600;letter-spacing:.04em;padding:1px 6px;border-radius:4px;text-transform:uppercase;margin-left:auto;white-space:nowrap}
+.tag.lpd{background:color-mix(in srgb,var(--php) 15%,transparent);color:var(--php)}
+.tag.com{background:var(--sunk);color:var(--muted)}
+.meta{font-size:12px;color:var(--muted);display:flex;gap:4px 10px;flex-wrap:wrap}
+.days{display:flex;gap:3px;align-items:center}
+.days i{font-style:normal;font-size:10px;font-weight:600;width:19px;height:17px;display:grid;place-items:center;border-radius:4px;background:var(--sunk);color:var(--muted);opacity:.55}
+.days i.on{background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--c);opacity:1}
+.days .freq{font-size:11px;color:var(--muted);margin-left:4px}
+.dates{display:flex;gap:10px;font-size:11.5px;color:var(--muted)}
+.dates b{color:var(--ink);font-weight:500}
+.bar{height:4px;background:var(--sunk);border-radius:3px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--c)}
+.bar.over span{background:var(--warn)}
+.flag{font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px;padding:1px 7px;border-radius:999px;align-self:flex-start}
+.flag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.flag.crit{color:var(--crit);background:color-mix(in srgb,var(--crit) 12%,transparent)}
+.flag.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 13%,transparent)}
+.flag.info{color:var(--info);background:color-mix(in srgb,var(--info) 12%,transparent)}
+
+.ghost{position:fixed;z-index:100;pointer-events:none;transform:rotate(2deg);box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:.95}
+
+/* Schedule */
+.week{display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:10px;overflow-x:auto;padding-bottom:6px}
+.day{background:var(--sunk);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;border:2px solid transparent;min-height:200px}
+.day.today{border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
+.day.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--sunk))}
+.day-h{padding:0 2px 6px;border-bottom:1px solid var(--line)}
+.day-h .dn{font-family:var(--f-display);font-weight:800;font-size:16px}
+.day-h .dd{color:var(--muted);font-size:12px;margin-left:6px}
+.day-h .cnt{font-size:12px;color:var(--muted);margin-top:2px}
+.day-h .cnt b{color:var(--ink);font-family:var(--f-display);font-size:15px}
+.mix{display:flex;height:5px;border-radius:3px;overflow:hidden;margin-top:6px;background:var(--line)}
+.chip{display:flex;align-items:center;gap:7px;background:var(--surface);border-radius:7px;padding:5px 8px;font-size:13px;cursor:grab;user-select:none;-webkit-user-select:none;box-shadow:var(--shadow);border:0;text-align:left;width:100%;touch-action:manipulation}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.chip .lv{margin-left:auto;font-size:10.5px;color:var(--c);font-weight:600}
+.chip .h{font-size:10px;color:var(--php);font-weight:600}
+.chip.dragging{opacity:.35}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin:0 0 10px}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+
+/* Table */
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;background:var(--sunk);position:sticky;top:0;cursor:pointer}
+th[aria-sort] {color:var(--ink)}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+td .lvl{font-weight:700;color:var(--c)}
+.tbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.tbar p{margin:0 auto 0 0;color:var(--muted);font-size:13px}
+
+/* Drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,18,22,.35);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);z-index:50;box-shadow:-8px 0 30px rgba(0,0,0,.18);display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer-h{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);border-top:4px solid var(--c)}
+.drawer-h h2{margin:0;font-family:var(--f-display);font-size:19px;font-weight:800}
+.drawer-h .x{margin-left:auto;border:0;background:none;font-size:22px;line-height:1;color:var(--muted);padding:4px 8px}
+.drawer-b{overflow-y:auto;padding:14px 18px 24px;display:flex;flex-direction:column;gap:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.fld{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fld.full{grid-column:1/-1}
+.fld label,.fld .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.fld input,.fld select,.fld textarea{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:7px 9px;width:100%;min-width:0}
+.fld .help{font-size:11.5px;color:var(--muted)}
+.daypick{display:flex;gap:5px;flex-wrap:wrap}
+.daypick button{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:5px 0;width:44px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.daypick button[aria-pressed="true"]{background:var(--c);border-color:var(--c);color:var(--surface)}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{flex:1;border:0;background:var(--bg);padding:7px;font-weight:600;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.sec-h{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;margin:4px 0 -4px}
+.hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.hist li{display:flex;gap:10px}
+.hist .mono{color:var(--muted);font-size:11.5px;min-width:52px}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.summary{display:flex;gap:8px;flex-wrap:wrap}
+
+/* Modal */
+.modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(720px,calc(100% - 32px));max-height:calc(100% - 40px);overflow:auto;background:var(--surface);border-radius:14px;z-index:60;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;gap:12px}
+.modal h2{margin:0;font-family:var(--f-display);font-size:19px}
+.modal p{margin:0;color:var(--muted)}
+.modal textarea{width:100%;min-height:110px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px;font-family:var(--f-mono);font-size:12px}
+.drop-zone{border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;color:var(--muted)}
+.drop-zone.over{border-color:var(--accent);color:var(--ink)}
+.maplist{display:flex;flex-wrap:wrap;gap:6px;font-size:12px}
+.maplist span{background:var(--sunk);border-radius:6px;padding:2px 8px}
+.maplist span.miss{color:var(--warn)}
+.err{color:var(--crit)!important}
+
+/* Toast */
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 14px;display:flex;gap:14px;align-items:center;z-index:80;max-width:calc(100% - 32px);font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.toast button{background:none;border:0;color:var(--bg);font-weight:700;text-decoration:underline;padding:0}
+
+@media (max-width:760px){
+  .board{grid-template-columns:1fr;overflow:visible}
+  .week{grid-template-columns:1fr 1fr;overflow:visible}
+  .brand h1{font-size:21px}
+  .filters input{max-width:none}
+}
+@media (max-width:440px){.week{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <p class="notice"><b>Prototype with made-up sample clients.</b> Don't enter real client information here. Changes save only in this browser.</p>
+  <header class="top">
+    <div class="brand"><h1>Census</h1><span class="date" id="today"></span></div>
+    <nav class="tabs" aria-label="Views">
+      <a href="#board" data-view="board">Board</a>
+      <a href="#schedule" data-view="schedule">Week</a>
+      <a href="#table" data-view="table">Spreadsheet</a>
+    </nav>
+    <div class="actions">
+      <button class="btn" id="btn-import">Import spreadsheet</button>
+      <button class="btn primary" id="btn-add">Add client</button>
+    </div>
+  </header>
+  <section class="stats" id="stats" aria-label="Census numbers"></section>
+  <div class="filters">
+    <input id="f-search" type="search" placeholder="Search name, referral, staff…" aria-label="Search">
+    <select id="f-staff" aria-label="Filter by staff"></select>
+    <select id="f-house" aria-label="Filter by housing">
+      <option value="">All housing</option><option value="LPD">LPD only</option><option value="Commuter">Commuters only</option>
+    </select>
+    <span class="spacer"></span>
+    <button class="btn small" id="btn-reset">Reset sample data</button>
+  </div>
+  <main id="view"></main>
+</div>
+<div id="layer"></div>
+<div id="toast-slot"></div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- constants ---------- */
+const DAYS=['mon','tue','wed','thu','fri','sat'];
+const DAY_LABEL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat'};
+const DAY_SHORT={mon:'M',tue:'T',wed:'W',thu:'Th',fri:'F',sat:'Sa'};
+const LOCS=['Pending','PHP','IOP','OP','Discharged'];
+const LEVELS=['PHP','IOP','OP'];
+const LOC_NAME={Pending:'Pending',PHP:'PHP',IOP:'IOP',OP:'OP',Discharged:'Discharged'};
+const LOC_SUB={Pending:'Referred, not yet admitted',PHP:'Partial hospitalization',IOP:'Intensive outpatient',OP:'Outpatient',Discharged:'Last 30 days'};
+const LOC_VAR={Pending:'--pend',PHP:'--php',IOP:'--iop',OP:'--op',Discharged:'--dc'};
+const RANK={Pending:0,PHP:1,IOP:2,OP:3,Discharged:4};
+const DEFAULT_DAYS={Pending:[],PHP:['mon','tue','wed','thu','fri'],IOP:['mon','wed','thu'],OP:['tue'],Discharged:[]};
+const DEFAULT_LOS={PHP:21,IOP:28};
+const OP_TO_DC=42;
+const KEY='census-prototype-v1';
+
+/* ---------- dates ---------- */
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const pISO=s=>{if(!s)return null;const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const TODAY=iso(new Date());
+const addDays=(s,n)=>{const d=pISO(s);d.setDate(d.getDate()+n);return iso(d)};
+const diff=(a,b)=>Math.round((pISO(b)-pISO(a))/864e5);
+const fmt=s=>s?pISO(s).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—';
+const wkday=s=>pISO(s).toLocaleDateString('en-US',{weekday:'short'});
+const dayKey=s=>['sun','mon','tue','wed','thu','fri','sat'][pISO(s).getDay()];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cvar=loc=>`var(${LOC_VAR[loc]})`;
+
+/* ---------- sample data (fictional) ---------- */
+const CLIN=['R. Patel, LCSW','M. Okafor, LPC','J. Lindqvist, LMFT','D. Ramos, LCADC'];
+const CM=['T. Nguyen','K. Brooks','S. Haddad'];
+const APN=['L. Moreau, PMHNP','A. Castillo, PMHNP'];
+function sample(){
+  const D=s=>s?s.split(' '):[];
+  const W='mon tue wed thu fri';
+  // name, loc, admit, stepDown, dc, days, clin, cm, apn, referral, commitDays, commitNote, housing, dischargedOn
+  const rows=[
+    ['Jordan Ashby','Pending',1,null,null,'',0,1,0,'Inpatient psych unit',56,'PHP 3 wks, then IOP','LPD'],
+    ['Priya Desmond','Pending',2,null,null,'',2,0,1,'Detox center',84,'PHP 4 wks, IOP 4 wks, OP 4 wks','LPD'],
+    ['Malik Torrance','Pending',6,null,null,'',1,2,0,'Outpatient therapist',42,'IOP 6 wks','Commuter'],
+    ['Avery Mendez','PHP',-16,3,40,W,0,0,0,'Inpatient psych unit',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Casey Holloway','PHP',-23,-1,30,W,1,1,1,'Detox center',84,'PHP 4 wks, IOP 4 wks, OP 4 wks','LPD'],
+    ['Noah Brandt','PHP',-9,12,52,W,2,2,0,'Hospital ED',56,'PHP 3 wks, IOP 5 wks','Commuter'],
+    ['Elena Ruiz','PHP',-4,17,60,W,3,0,1,'Self-referral',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Theo Kaminski','PHP',-19,2,36,W,0,1,0,'Alumni referral',56,'PHP 3 wks, IOP 5 wks','Commuter'],
+    ['Imani Clarke','PHP',-12,9,49,W,1,2,1,'Inpatient psych unit',84,'PHP 4 wks, IOP 4 wks, OP 4 wks','LPD'],
+    ['Grace Whitfield','PHP',-2,19,55,W,2,0,0,'Family',56,'PHP 3 wks, IOP 5 wks','Commuter'],
+    ['Samir Haddock','IOP',-31,6,25,'mon wed thu',3,1,1,'Detox center',56,'PHP 3 wks, IOP 5 wks','LPD'],
+    ['Lucia Fontaine','IOP',-38,-3,18,'tue wed fri',0,2,0,'EAP',56,'PHP 2 wks, IOP 6 wks','Commuter'],
+    ['Devon Pierce','IOP',-27,10,38,'mon wed thu',1,0,1,'Inpatient psych unit',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Hannah Osei','IOP',-44,1,12,'mon tue thu',2,1,0,'Outpatient therapist',42,'IOP 6 wks','Commuter'],
+    ['Marcus Lyle','IOP',-20,15,44,'mon wed thu',3,2,1,'Self-referral',56,'IOP 8 wks','LPD'],
+    ['Rosa Delgado','IOP',-35,4,30,'tue wed fri',0,0,0,'Hospital ED',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Wyatt Ferris','IOP',-14,21,50,'mon wed thu',1,1,1,'Alumni referral',56,'IOP 8 wks','Commuter'],
+    ['Nadia Vance','OP',-58,null,5,'tue',2,2,0,'Detox center',56,'PHP 3 wks, IOP 5 wks','Commuter'],
+    ['Oliver Grant','OP',-71,null,-2,'thu',3,0,1,'Inpatient psych unit',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Simone Achebe','OP',-49,null,20,'tue',0,1,0,'EAP',84,'PHP 4 wks, IOP 4 wks, OP 4 wks','Commuter'],
+    ['Ben Okonkwo','OP',-64,null,13,'wed',1,2,1,'Family',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Riley Starr','Discharged',-60,null,-3,'',2,0,0,'Hospital ED',56,'PHP 3 wks, IOP 5 wks','Commuter',-3],
+    ['Frances Iwu','Discharged',-75,null,-8,'',3,1,1,'Detox center',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD',-8],
+    ['Quinn Albright','Discharged',-40,null,-14,'',0,2,0,'Self-referral',42,'IOP 6 wks','Commuter',-14],
+  ];
+  return rows.map((r,i)=>({
+    id:'c'+(i+1), name:r[0], loc:r[1], admitDate:addDays(TODAY,r[2]),
+    stepDown:r[3]==null?'':addDays(TODAY,r[3]), dcDate:r[4]==null?'':addDays(TODAY,r[4]),
+    days:D(r[5]), clinician:CLIN[r[6]], caseManager:CM[r[7]], psychApn:APN[r[8]],
+    referral:r[9], commitDays:r[10], commitNote:r[11], housing:r[12],
+    dischargedOn:r[13]==null?'':addDays(TODAY,r[13]),
+    history:[{date:addDays(TODAY,Math.min(r[2],0)),text:r[1]==='Pending'?'Referral received':'Admitted'}]
+  }));
+}
+
+/* ---------- state ---------- */
+let state=load();
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients))return s}catch(e){}return{clients:sample(),seq:100}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+const byId=id=>state.clients.find(c=>c.id===id);
+let undoSnap=null;
+function snap(){undoSnap=JSON.stringify(state)}
+
+/* ---------- derived ---------- */
+const losDays=c=>c.admitDate&&c.loc!=='Pending'?Math.max(1,diff(c.admitDate,c.dischargedOn||TODAY)+1):0;
+const freq=c=>c.days.length?`${c.days.length}x/wk`:'—';
+function flags(c){
+  const f=[];
+  if(c.loc==='Pending'){
+    if(c.admitDate){const d=diff(TODAY,c.admitDate);
+      f.push(d<0?{lvl:'crit',text:`Admit date passed ${-d}d ago`}:d===0?{lvl:'warn',text:'Admits today'}:d===1?{lvl:'warn',text:'Admits tomorrow'}:{lvl:'info',text:`Admits ${wkday(c.admitDate)} ${fmt(c.admitDate)}`})}
+    else f.push({lvl:'warn',text:'No admit date'});
+    return f;
+  }
+  if(c.loc==='Discharged')return f;
+  if(c.stepDown&&c.loc!=='OP'){const d=diff(TODAY,c.stepDown);
+    if(d<0)f.push({lvl:'crit',text:`Step-down ${-d}d overdue`});else if(d<=3)f.push({lvl:'warn',text:d===0?'Step-down today':`Step-down in ${d}d`})}
+  if(c.dcDate){const d=diff(TODAY,c.dcDate);
+    if(d<0)f.push({lvl:'crit',text:`DC ${-d}d overdue`});else if(d<=7)f.push({lvl:'warn',text:d===0?'DC today':`DC in ${d}d`})}
+  if(c.commitDays&&losDays(c)>c.commitDays)f.push({lvl:'warn',text:'Past incoming commitment'});
+  if(!c.days.length)f.push({lvl:'warn',text:'No schedule set'});
+  return f;
+}
+const sev={crit:0,warn:1,info:2};
+
+/* ---------- filters ---------- */
+const F={q:'',staff:'',house:''};
+function visible(c){
+  if(F.house&&c.housing!==F.house)return false;
+  if(F.staff&&![c.clinician,c.caseManager,c.psychApn].includes(F.staff))return false;
+  if(F.q){const q=F.q.toLowerCase();if(![c.name,c.referral,c.clinician,c.caseManager,c.psychApn,c.loc].join(' ').toLowerCase().includes(q))return false}
+  return true;
+}
+const recentDc=c=>c.loc!=='Discharged'||!c.dischargedOn||diff(c.dischargedOn,TODAY)<=30;
+
+/* ---------- automation: moving level of care ---------- */
+function daysText(d){return d.length?d.map(k=>DAY_LABEL[k]).join(', '):'none'}
+function moveLoc(id,to){
+  const c=byId(id);if(!c||c.loc===to)return;
+  snap();
+  const from=c.loc, msg=[];
+  const verb=to==='Discharged'?'discharged':from==='Pending'?`admitted to ${to}`:from==='Discharged'?`readmitted to ${to}`:RANK[to]>RANK[from]?`stepped down to ${to}`:`stepped up to ${to}`;
+  c.loc=to;
+  if(to==='Discharged'){
+    c.dischargedOn=TODAY;c.days=[];c.stepDown='';
+    msg.push('Discharge date set to today.');
+  }else if(to==='Pending'){
+    c.days=[];c.dischargedOn='';
+  }else{
+    if(from==='Pending'||from==='Discharged'){if(!c.admitDate||c.admitDate>TODAY||from==='Discharged')c.admitDate=TODAY;c.dischargedOn=''}
+    c.days=[...DEFAULT_DAYS[to]];
+    msg.push(`Schedule set to ${daysText(c.days)} (${freq(c)}).`);
+    if(DEFAULT_LOS[to]){c.stepDown=addDays(TODAY,DEFAULT_LOS[to]);msg.push(`Next step-down projected ${fmt(c.stepDown)}.`)}
+    else{c.stepDown='';if(!c.dcDate||c.dcDate<TODAY){c.dcDate=addDays(TODAY,OP_TO_DC);msg.push(`DC projected ${fmt(c.dcDate)}.`)}}
+  }
+  c.history.push({date:TODAY,text:`${from} → ${to}`});
+  save();render();
+  toast(`${c.name} ${verb}. ${msg.join(' ')}`,true);
+}
+function moveDay(id,fromDay,toDay){
+  const c=byId(id);if(!c||fromDay===toDay)return;
+  if(c.days.includes(toDay)){toast(`${c.name} is already scheduled on ${DAY_LABEL[toDay]}.`);return}
+  snap();
+  c.days=c.days.map(d=>d===fromDay?toDay:d).sort((a,b)=>DAYS.indexOf(a)-DAYS.indexOf(b));
+  c.history.push({date:TODAY,text:`Schedule: ${DAY_LABEL[fromDay]} moved to ${DAY_LABEL[toDay]}`});
+  save();render();
+  toast(`${c.name} moved from ${DAY_LABEL[fromDay]} to ${DAY_LABEL[toDay]}.`,true);
+}
+
+/* ---------- rendering ---------- */
+const $=s=>document.querySelector(s);
+let view='board', sort={k:'loc',dir:1}, openId=null;
+
+function renderStats(){
+  const act=state.clients.filter(c=>LEVELS.includes(c.loc));
+  const n=l=>state.clients.filter(c=>c.loc===l).length;
+  const lpd=act.filter(c=>c.housing==='LPD').length;
+  const tk=dayKey(TODAY), todayCount=act.filter(c=>c.days.includes(tk)).length;
+  const attn=state.clients.filter(c=>recentDc(c)&&flags(c).some(f=>f.lvl!=='info')).length;
+  const st=(k,v,s,cls='',sw='')=>`<div class="stat ${cls}"><div class="k">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  $('#stats').innerHTML=
+    st('Active census',act.length,'PHP + IOP + OP')+
+    st('PHP',n('PHP'),'partial hosp.','',cvar('PHP'))+
+    st('IOP',n('IOP'),'intensive outpt.','',cvar('IOP'))+
+    st('OP',n('OP'),'outpatient','',cvar('OP'))+
+    st('Pending',n('Pending'),'incoming admits','',cvar('Pending'))+
+    st('LPD',lpd,`${act.length-lpd} commuters`)+
+    st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
+    st('Need attention',attn,'see list below',attn?'alert':'');
+}
+function renderStaffFilter(){
+  const sel=$('#f-staff'), cur=F.staff;
+  const act=state.clients.filter(c=>c.loc!=='Discharged');
+  const cnt=name=>act.filter(c=>[c.clinician,c.caseManager,c.psychApn].includes(name)).length;
+  const uniq=k=>[...new Set(state.clients.map(c=>c[k]).filter(Boolean))].sort();
+  const grp=(label,k)=>`<optgroup label="${label}">${uniq(k).map(s=>`<option value="${esc(s)}">${esc(s)} (${cnt(s)})</option>`).join('')}</optgroup>`;
+  sel.innerHTML=`<option value="">All staff</option>${grp('Clinicians','clinician')}${grp('Case managers','caseManager')}${grp('Psych APNs','psychApn')}`;
+  sel.value=cur;
+}
+function daysDots(c){return `<span class="days">${DAYS.map(d=>`<i class="${c.days.includes(d)?'on':''}">${DAY_SHORT[d]}</i>`).join('')}<span class="freq">${freq(c)}</span></span>`}
+function card(c){
+  const fl=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);
+  const los=losDays(c);
+  let dates='';
+  if(c.loc==='Pending')dates=`<div class="dates"><span>Admit <b>${fmt(c.admitDate)}</b></span><span>${esc(c.referral)}</span></div>`;
+  else if(c.loc==='Discharged')dates=`<div class="dates"><span>DC'd <b>${fmt(c.dischargedOn)}</b></span><span>${los} days total</span></div>`;
+  else dates=`<div class="dates">${c.loc!=='OP'?`<span>Step-down <b>${fmt(c.stepDown)}</b></span>`:''}<span>DC <b>${fmt(c.dcDate)}</b></span></div>`;
+  const pct=c.commitDays&&los?Math.min(100,Math.round(los/c.commitDays*100)):0;
+  const bar=LEVELS.includes(c.loc)&&c.commitDays?`<div class="bar ${los>c.commitDays?'over':''}" title="Day ${los} of ${c.commitDays}-day commitment"><span style="width:${pct}%"></span></div>`:'';
+  const meta=c.loc==='Discharged'?esc(c.clinician):c.loc==='Pending'?`${esc(c.clinician)} · ${esc(c.commitNote||'No commitment noted')}`:`${los?`Day ${los}${c.commitDays?` of ${c.commitDays}`:''} · `:''}${esc(c.clinician)}`;
+  return `<div class="card" style="--c:${cvar(c.loc)}" data-drag="client" data-id="${c.id}" tabindex="0" role="button" aria-label="${esc(c.name)}, ${c.loc}. Open details">
+    <div class="card-top"><span class="name">${esc(c.name)}</span><span class="tag ${c.housing==='LPD'?'lpd':'com'}">${c.housing==='LPD'?'LPD':'Commuter'}</span></div>
+    <div class="meta">${meta}</div>
+    ${LEVELS.includes(c.loc)?daysDots(c):''}
+    ${dates}${bar}
+    ${fl.length?`<span class="flag ${fl[0].lvl}">${esc(fl[0].text)}${fl.length>1?` +${fl.length-1}`:''}</span>`:''}
+  </div>`;
+}
+function renderAttention(list){
+  const items=[];
+  list.filter(recentDc).forEach(c=>flags(c).filter(f=>f.lvl!=='info').forEach(f=>items.push({c,f})));
+  items.sort((a,b)=>sev[a.f.lvl]-sev[b.f.lvl]||a.c.name.localeCompare(b.c.name));
+  return `<section class="attn"><h2>Needs attention</h2>${items.length?`<ul>${items.map(({c,f})=>`<li><button data-open="${c.id}"><span class="flag ${f.lvl}" style="padding:0;background:none">${esc(f.text)}</span>${esc(c.name)} · ${c.loc}</button></li>`).join('')}</ul>`:'<p class="empty">Nothing due in the next few days.</p>'}</section>`;
+}
+function renderBoard(){
+  const list=state.clients.filter(visible);
+  const cols=LOCS.map(l=>{
+    let cs=list.filter(c=>c.loc===l&&recentDc(c));
+    cs.sort((a,b)=>l==='Pending'?(a.admitDate||'').localeCompare(b.admitDate||''):l==='Discharged'?(b.dischargedOn||'').localeCompare(a.dischargedOn||''):(a.stepDown||a.dcDate||'9').localeCompare(b.stepDown||b.dcDate||'9'));
+    return `<section class="col" style="--c:${cvar(l)}" data-drop="loc" data-loc="${l}" aria-label="${LOC_NAME[l]}">
+      <div class="col-h"><h3>${LOC_NAME[l]}</h3><span class="n">${cs.length}</span><span class="sub">${LOC_SUB[l]}</span></div>
+      ${cs.map(card).join('')||`<div class="hint">Drag a client here</div>`}
+    </section>`;
+  }).join('');
+  return renderAttention(list)+`<div class="board">${cols}</div>`;
+}
+function weekDates(){const d=pISO(TODAY);const dow=(d.getDay()+6)%7;const mon=addDays(TODAY,-dow);return DAYS.map((k,i)=>({k,date:addDays(mon,i)}))}
+function renderSchedule(){
+  const list=state.clients.filter(c=>LEVELS.includes(c.loc)&&visible(c));
+  const legend=`<div class="legend">${LEVELS.map(l=>`<span><span class="swatch" style="background:${cvar(l)}"></span>${l}</span>`).join('')}<span>Drag a name to another day to change that client's schedule. Click a name for details.</span></div>`;
+  const cols=weekDates().map(({k,date})=>{
+    const cs=list.filter(c=>c.days.includes(k)).sort((a,b)=>RANK[a.loc]-RANK[b.loc]||a.name.localeCompare(b.name));
+    const by=l=>cs.filter(c=>c.loc===l).length, lpd=cs.filter(c=>c.housing==='LPD').length;
+    const mix=cs.length?LEVELS.map(l=>`<span style="width:${by(l)/cs.length*100}%;background:${cvar(l)}"></span>`).join(''):'';
+    return `<section class="day ${date===TODAY?'today':''}" data-drop="day" data-day="${k}" aria-label="${DAY_LABEL[k]}">
+      <div class="day-h"><span class="dn">${DAY_LABEL[k]}</span><span class="dd">${fmt(date)}${date===TODAY?' · today':''}</span>
+        <div class="cnt"><b>${cs.length}</b> expected · ${LEVELS.map(l=>`${l} ${by(l)}`).join(' · ')} · LPD ${lpd}</div>
+        <div class="mix">${mix}</div></div>
+      ${cs.map(c=>`<button class="chip" style="--c:${cvar(c.loc)}" data-drag="sched" data-id="${c.id}" data-day="${k}"><span class="dot"></span>${esc(c.name)}${c.housing==='LPD'?'<span class="h">LPD</span>':''}<span class="lv">${c.loc}</span></button>`).join('')}
+    </section>`;
+  }).join('');
+  return legend+`<div class="week">${cols}</div>`;
+}
+const COLS=[
+  ['name','Client',c=>c.name],['loc','LOC',c=>c.loc],['housing','Housing',c=>c.housing],
+  ['admitDate','Admitted',c=>c.admitDate],['los','Day #',c=>losDays(c)||''],
+  ['stepDown','Proj. step-down',c=>c.stepDown],['dcDate','Proj. DC',c=>c.dcDate],
+  ['freq','Frequency',c=>freq(c)],['days','Schedule',c=>c.days.map(d=>DAY_SHORT[d]).join(' ')],
+  ['clinician','Clinician',c=>c.clinician],['caseManager','Case manager',c=>c.caseManager],['psychApn','Psych APN',c=>c.psychApn],
+  ['referral','Referral source',c=>c.referral],['commit','Incoming commitment',c=>c.commitNote+(c.commitDays?` (${c.commitDays} days)`:'')],
+];
+function sortedRows(){
+  const list=state.clients.filter(c=>visible(c)&&recentDc(c));
+  const col=COLS.find(x=>x[0]===sort.k);
+  const val=c=>sort.k==='loc'?RANK[c.loc]:col[2](c);
+  return list.sort((a,b)=>{const x=val(a),y=val(b);return (x>y?1:x<y?-1:a.name.localeCompare(b.name))*sort.dir});
+}
+function renderTable(){
+  const rows=sortedRows();
+  const isDate=k=>['admitDate','stepDown','dcDate'].includes(k);
+  return `<div class="tbar"><p>${rows.length} clients shown. Click a column to sort, or a row to edit.</p>
+    <button class="btn small" id="btn-copy">Copy as spreadsheet (CSV)</button></div>
+  <div class="tablewrap"><table><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
+  <tbody>${rows.map(c=>`<tr data-open="${c.id}" style="--c:${cvar(c.loc)}">${COLS.map(([k,,f])=>{const v=f(c);return `<td class="${isDate(k)||k==='los'?'mono':''}">${k==='loc'?`<span class="lvl">${v}</span>`:isDate(k)?fmt(v):esc(v)||'—'}</td>`}).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function render(){
+  $('#today').textContent=pISO(TODAY).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.view===view?'page':'false'));
+  renderStats();renderStaffFilter();
+  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='table'?renderTable():renderBoard();
+  if(openId)renderDrawer();
+}
+
+/* ---------- drawer ---------- */
+let confirmDel=false;
+function closeLayer(){openId=null;confirmDel=false;$('#layer').innerHTML=''}
+function openClient(id){openId=id;confirmDel=false;renderDrawer();setTimeout(()=>$('.drawer .x')?.focus(),0)}
+function renderDrawer(){
+  const c=byId(openId);if(!c){closeLayer();return}
+  const opt=(arr,v)=>arr.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
+  const staff=k=>[...new Set(state.clients.map(x=>x[k]).filter(Boolean))].sort();
+  const fl=flags(c), los=losDays(c);
+  const scroll=$('.drawer-b')?.scrollTop||0;
+  $('#layer').innerHTML=`<div class="scrim" data-close></div>
+  <aside class="drawer" style="--c:${cvar(c.loc)}" role="dialog" aria-label="${esc(c.name)} details">
+    <div class="drawer-h"><h2>${esc(c.name)}</h2><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="drawer-b">
+      <div class="summary">${fl.map(f=>`<span class="flag ${f.lvl}">${esc(f.text)}</span>`).join('')}${los?`<span class="flag info">Day ${los}${c.commitDays?` of ${c.commitDays}`:''}</span>`:''}</div>
+      <div class="grid2">
+        <div class="fld full"><label for="d-name">Client name</label><input id="d-name" data-f="name" value="${esc(c.name)}"></div>
+        <div class="fld"><label for="d-loc">Level of care</label><select id="d-loc" data-loc-select>${LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></div>
+        <div class="fld"><span class="lbl">Housing</span><div class="seg">${['LPD','Commuter'].map(h=>`<button type="button" data-house="${h}" aria-pressed="${c.housing===h}">${h}</button>`).join('')}</div></div>
+        <div class="fld"><label for="d-admit">Admission date</label><input id="d-admit" type="date" data-f="admitDate" value="${c.admitDate}"></div>
+        <div class="fld"><label for="d-step">Projected step-down</label><input id="d-step" type="date" data-f="stepDown" value="${c.stepDown}" ${c.loc==='OP'||c.loc==='Discharged'?'disabled':''}></div>
+        <div class="fld"><label for="d-dc">Projected DC</label><input id="d-dc" type="date" data-f="dcDate" value="${c.dcDate}"></div>
+        ${c.loc==='Discharged'?`<div class="fld"><label for="d-dco">Discharged on</label><input id="d-dco" type="date" data-f="dischargedOn" value="${c.dischargedOn}"></div>`:''}
+        <div class="fld full"><span class="lbl">Attendance schedule · ${freq(c)}</span><div class="daypick">${DAYS.map(d=>`<button type="button" data-day-toggle="${d}" aria-pressed="${c.days.includes(d)}">${DAY_LABEL[d]}</button>`).join('')}</div></div>
+      </div>
+      <div class="sec-h">Care team</div>
+      <div class="grid2">
+        <div class="fld"><label for="d-clin">Clinician</label><select id="d-clin" data-f="clinician">${opt(staff('clinician'),c.clinician)}</select></div>
+        <div class="fld"><label for="d-cm">Case manager</label><select id="d-cm" data-f="caseManager">${opt(staff('caseManager'),c.caseManager)}</select></div>
+        <div class="fld"><label for="d-apn">Psych APN</label><select id="d-apn" data-f="psychApn">${opt(staff('psychApn'),c.psychApn)}</select></div>
+        <div class="fld"><label for="d-ref">Referral source</label><input id="d-ref" data-f="referral" value="${esc(c.referral)}"></div>
+      </div>
+      <div class="sec-h">Incoming commitment</div>
+      <div class="grid2">
+        <div class="fld"><label for="d-cd">Length of stay (days)</label><input id="d-cd" type="number" min="0" data-f="commitDays" value="${c.commitDays||''}"></div>
+        <div class="fld"><label for="d-cn">Plan of care</label><input id="d-cn" data-f="commitNote" value="${esc(c.commitNote)}" placeholder="e.g. PHP 3 wks, IOP 4 wks"></div>
+      </div>
+      <div class="sec-h">History</div>
+      <ul class="hist">${[...c.history].reverse().map(h=>`<li><span class="mono">${fmt(h.date)}</span><span>${esc(h.text)}</span></li>`).join('')}</ul>
+      <div class="confirm">${confirmDel?`Remove ${esc(c.name)} from the census? <button class="btn small danger" data-del-yes>Remove</button><button class="btn small" data-del-no>Cancel</button>`:`<button class="btn small danger" data-del>Remove from census</button>`}</div>
+    </div>
+  </aside>`;
+  $('.drawer-b').scrollTop=scroll;
+}
+function setField(c,f,v){
+  if(f==='commitDays')v=parseInt(v,10)||0;
+  if(f==='name'&&!v.trim())return;
+  c[f]=v;save();
+  const keepFocus=document.activeElement?.id;
+  renderStats();renderStaffFilter();
+  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='table'?renderTable():renderBoard();
+  if(f!=='name'&&f!=='referral'&&f!=='commitNote'){renderDrawer();if(keepFocus)document.getElementById(keepFocus)?.focus()}
+  else $('.drawer-h h2').textContent=c.name;
+}
+document.addEventListener('change',e=>{
+  const c=byId(openId);
+  if(e.target.matches('[data-loc-select]')&&c){moveLoc(c.id,e.target.value);return}
+  if(e.target.dataset.f&&c&&e.target.closest('.drawer'))setField(c,e.target.dataset.f,e.target.value);
+});
+document.addEventListener('input',e=>{
+  const c=byId(openId);
+  if(c&&e.target.closest('.drawer')&&['name','referral','commitNote'].includes(e.target.dataset.f))setField(c,e.target.dataset.f,e.target.value);
+  if(e.target.id==='f-search'){F.q=e.target.value;render()}
+});
+$('#f-staff').addEventListener('change',e=>{F.staff=e.target.value;render()});
+$('#f-house').addEventListener('change',e=>{F.house=e.target.value;render()});
+
+/* ---------- clicks ---------- */
+let suppressClick=false;
+document.addEventListener('click',e=>{
+  if(suppressClick){suppressClick=false;e.preventDefault();return}
+  const t=e.target;
+  const c=byId(openId);
+  if(t.closest('[data-close]')){closeLayer();return}
+  const opener=t.closest('[data-open],[data-drag]');
+  if(opener&&!t.closest('.drawer')&&!t.closest('.modal')){openClient(opener.dataset.open||opener.dataset.id);return}
+  const th=t.closest('th[data-sort]');
+  if(th){const k=th.dataset.sort;sort=sort.k===k?{k,dir:-sort.dir}:{k,dir:1};render();return}
+  if(t.closest('[data-day-toggle]')&&c){const d=t.closest('[data-day-toggle]').dataset.dayToggle;
+    c.days=c.days.includes(d)?c.days.filter(x=>x!==d):[...c.days,d].sort((a,b)=>DAYS.indexOf(a)-DAYS.indexOf(b));save();render();return}
+  if(t.closest('[data-house]')&&c){c.housing=t.closest('[data-house]').dataset.house;save();render();return}
+  if(t.closest('[data-del]')){confirmDel=true;renderDrawer();return}
+  if(t.closest('[data-del-no]')){confirmDel=false;renderDrawer();return}
+  if(t.closest('[data-del-yes]')&&c){snap();const name=c.name;state.clients=state.clients.filter(x=>x.id!==c.id);save();closeLayer();render();toast(`${name} removed.`,true);return}
+  if(t.closest('[data-undo]')){if(undoSnap){state=JSON.parse(undoSnap);undoSnap=null;save();render();toast('Undone.')}return}
+  if(t.id==='btn-copy'){copyCsv(t);return}
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&$('#layer').innerHTML)closeLayer();
+  if((e.key==='Enter'||e.key===' ')&&e.target.matches('.card')){e.preventDefault();openClient(e.target.dataset.id)}
+});
+$('#btn-add').addEventListener('click',()=>{
+  snap();const id='n'+(state.seq++);
+  state.clients.push({id,name:'New client',loc:'Pending',admitDate:addDays(TODAY,1),stepDown:'',dcDate:'',days:[],clinician:CLIN[0],caseManager:CM[0],psychApn:APN[0],referral:'',commitDays:0,commitNote:'',housing:'Commuter',dischargedOn:'',history:[{date:TODAY,text:'Referral entered'}]});
+  save();if(view!=='board')location.hash='#board';render();openClient(id);
+  setTimeout(()=>{const n=$('#d-name');n?.focus();n?.select()},10);
+});
+let resetArmed=false;
+$('#btn-reset').addEventListener('click',e=>{
+  if(!resetArmed){resetArmed=true;e.target.textContent='Click again to reset';setTimeout(()=>{resetArmed=false;e.target.textContent='Reset sample data'},3000);return}
+  resetArmed=false;e.target.textContent='Reset sample data';snap();state={clients:sample(),seq:100};save();closeLayer();render();toast('Sample data restored.',true);
+});
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(text,undo){
+  clearTimeout(toastTimer);
+  $('#toast-slot').innerHTML=`<div class="toast" role="status"><span>${esc(text)}</span>${undo?'<button data-undo>Undo</button>':''}</div>`;
+  toastTimer=setTimeout(()=>$('#toast-slot').innerHTML='',7000);
+}
+
+/* ---------- drag and drop (mouse + touch) ---------- */
+let drag=null;
+document.addEventListener('pointerdown',e=>{
+  if(e.button!==0)return;
+  const el=e.target.closest('[data-drag]');if(!el||el.closest('.drawer'))return;
+  drag={el,x:e.clientX,y:e.clientY,active:false,touch:e.pointerType!=='mouse',timer:null,target:null,id:e.pointerId};
+  if(drag.touch)drag.timer=setTimeout(()=>{if(drag&&!drag.active)startDrag(drag.x,drag.y)},280);
+});
+function startDrag(x,y){
+  drag.active=true;
+  const r=drag.el.getBoundingClientRect();
+  const g=drag.el.cloneNode(true);g.classList.add('ghost');g.style.width=r.width+'px';
+  drag.dx=x-r.left;drag.dy=y-r.top;drag.ghost=g;document.body.appendChild(g);
+  drag.el.classList.add('dragging');moveGhost(x,y);
+  if(navigator.vibrate)try{navigator.vibrate(10)}catch(_){}
+}
+function moveGhost(x,y){
+  drag.ghost.style.left=(x-drag.dx)+'px';drag.ghost.style.top=(y-drag.dy)+'px';
+  const want=drag.el.dataset.drag==='client'?'loc':'day';
+  const t=document.elementFromPoint(x,y)?.closest(`[data-drop="${want}"]`)||null;
+  if(t!==drag.target){drag.target?.classList.remove('over');t?.classList.add('over');drag.target=t}
+  if(y<50)window.scrollBy(0,-12);else if(y>innerHeight-50)window.scrollBy(0,12);
+}
+document.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const dist=Math.hypot(e.clientX-drag.x,e.clientY-drag.y);
+  if(!drag.active){
+    if(drag.touch){if(dist>8){clearTimeout(drag.timer);drag=null}return}
+    if(dist>5)startDrag(e.clientX,e.clientY);else return;
+  }
+  moveGhost(e.clientX,e.clientY);
+});
+document.addEventListener('touchmove',e=>{if(drag&&drag.active)e.preventDefault()},{passive:false});
+function endDrag(drop){
+  if(!drag)return;clearTimeout(drag.timer);
+  if(drag.active){
+    const d=drag;d.ghost.remove();d.el.classList.remove('dragging');d.target?.classList.remove('over');
+    suppressClick=true;setTimeout(()=>suppressClick=false,50);
+    drag=null;
+    if(drop&&d.target){
+      if(d.el.dataset.drag==='client')moveLoc(d.el.dataset.id,d.target.dataset.loc);
+      else moveDay(d.el.dataset.id,d.el.dataset.day,d.target.dataset.day);
+    }
+  }else drag=null;
+}
+document.addEventListener('pointerup',()=>endDrag(true));
+document.addEventListener('pointercancel',()=>endDrag(false));
+document.addEventListener('contextmenu',e=>{if(drag&&drag.touch)e.preventDefault()});
+
+/* ---------- CSV export ---------- */
+function toCsv(){
+  const head=['Client name','Admission date','Projected step-down date','Projected DC date','LOC','Frequency','Attendance schedule','Clinician','Case manager','Psych APN','Referral source','Incoming commitment','Commitment days','Housing'];
+  const q=v=>{v=String(v??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
+  const rows=state.clients.map(c=>[c.name,c.admitDate,c.stepDown,c.dcDate,c.loc,freq(c),c.days.map(d=>DAY_LABEL[d]).join(' '),c.clinician,c.caseManager,c.psychApn,c.referral,c.commitNote,c.commitDays||'',c.housing]);
+  return [head,...rows].map(r=>r.map(q).join(',')).join('\n');
+}
+function copyCsv(btn){
+  const text=toCsv();
+  const done=()=>{btn.textContent='Copied. Paste into Excel';setTimeout(()=>btn.textContent='Copy as spreadsheet (CSV)',2500)};
+  try{navigator.clipboard.writeText(text).then(done,()=>fallbackCopy(text))}catch(_){fallbackCopy(text)}
+}
+function fallbackCopy(text){
+  $('#layer').innerHTML=`<div class="scrim" data-close></div><div class="modal" role="dialog" aria-label="Copy CSV"><h2>Copy the census</h2><p>Select all of this text and copy it, then paste into Excel.</p><textarea id="csv-out" readonly>${esc(text)}</textarea><div class="actions"><button class="btn" data-close>Close</button></div></div>`;
+  const t=$('#csv-out');t.focus();t.select();
+}
+
+/* ---------- import ---------- */
+function parseCsv(text){
+  const rows=[];let row=[],cell='',q=false;
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(q){if(ch==='"'){if(text[i+1]==='"'){cell+='"';i++}else q=false}else cell+=ch}
+    else if(ch==='"')q=true;
+    else if(ch===','||ch==='\t'){row.push(cell);cell=''}
+    else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(cell);rows.push(row);row=[];cell=''}
+    else cell+=ch}
+  if(cell||row.length){row.push(cell);rows.push(row)}
+  return rows.filter(r=>r.some(x=>String(x).trim()));
+}
+const FIELD_LABEL={name:'Client name',admitDate:'Admission date',stepDown:'Projected step-down',dcDate:'Projected DC',loc:'LOC',freq:'Frequency',days:'Schedule',clinician:'Clinician',caseManager:'Case manager',psychApn:'Psych APN',referral:'Referral source',commit:'Incoming commitment',housing:'Housing (LPD/commuter)'};
+function matchHeader(h){
+  const s=String(h).toLowerCase().replace(/[^a-z]/g,'');
+  if(!s)return null;
+  if(/step/.test(s))return 'stepDown';
+  if(/dc|discharg/.test(s))return 'dcDate';
+  if(/admi|start/.test(s))return 'admitDate';
+  if(/freq/.test(s))return 'freq';
+  if(/sched|days/.test(s))return 'days';
+  if(/case|^cm/.test(s))return 'caseManager';
+  if(/psych|apn|prescrib|np$/.test(s))return 'psychApn';
+  if(/clinician|therapist|primary/.test(s))return 'clinician';
+  if(/referr|source/.test(s))return 'referral';
+  if(/commit|plan|los/.test(s))return 'commit';
+  if(/hous|lpd|commut|resid/.test(s))return 'housing';
+  if(/loc|level|program/.test(s))return 'loc';
+  if(/name|client|patient/.test(s))return 'name';
+  return null;
+}
+function parseDate(v){
+  if(v==null||v==='')return '';
+  if(v instanceof Date&&!isNaN(v))return iso(v);
+  if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return iso(new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()))}
+  const s=String(v).trim();let m;
+  if(m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  if(m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/)){let y=+m[3];if(y<100)y+=2000;return `${y}-${pad(m[1])}-${pad(m[2])}`}
+  const d=new Date(s);return isNaN(d)?'':iso(d);
+}
+function parseLoc(v){const s=String(v||'').toLowerCase();
+  if(/php|partial/.test(s))return 'PHP';if(/iop|intensive/.test(s))return 'IOP';
+  if(/disch|^dc/.test(s))return 'Discharged';if(/pend|refer|wait|incoming/.test(s))return 'Pending';
+  if(/op|outpat/.test(s))return 'OP';return ''}
+function parseDays(v,loc){
+  const s=String(v||'').toLowerCase();
+  if(/m\s*-\s*f|mon\w*\s*-\s*fri|daily|weekdays/.test(s))return ['mon','tue','wed','thu','fri'];
+  const map={mon:'mon',m:'mon',tue:'tue',tues:'tue',tu:'tue',t:'tue',wed:'wed',w:'wed',thu:'thu',thur:'thu',thurs:'thu',th:'thu',r:'thu',fri:'fri',f:'fri',sat:'sat',sa:'sat',s:'sat'};
+  const out=new Set();(s.match(/mon|tues?|wed|thur?s?|fri|sat|th|tu|sa|m|t|w|r|f|s/g)||[]).forEach(t=>map[t]&&out.add(map[t]));
+  const d=[...out].sort((a,b)=>DAYS.indexOf(a)-DAYS.indexOf(b));
+  return d.length?d:[...(DEFAULT_DAYS[loc]||[])];
+}
+function parseCommit(v){const s=String(v||'');let m,days=0;
+  if(m=s.match(/(\d+)\s*(w|wk|week)/i)){days=0;s.replace(/(\d+)\s*(?:w|wk|weeks?)\b/gi,(_,n)=>{days+=n*7})}
+  else if(m=s.match(/(\d+)\s*d/i))days=+m[1];
+  else if(m=s.match(/^\s*(\d+)\s*$/))days=+m[1];
+  return {commitDays:days,commitNote:s.trim()}}
+let pending=null;
+function openImport(){
+  pending=null;
+  $('#layer').innerHTML=`<div class="scrim" data-close></div>
+  <div class="modal" role="dialog" aria-label="Import spreadsheet">
+    <h2>Import your census spreadsheet</h2>
+    <p>Choose an Excel (.xlsx) or CSV file, or paste rows copied from Excel. The first row should be column headings such as Client name, Admission date, LOC, Clinician. Use made-up names only in this prototype.</p>
+    <label class="drop-zone" id="dz" for="imp-file"><input id="imp-file" type="file" accept=".xlsx,.xls,.csv,.tsv,.txt" hidden><b>Choose a file</b> or drop it here</label>
+    <textarea id="imp-paste" placeholder="…or paste spreadsheet rows here"></textarea>
+    <div id="imp-preview"></div>
+    <div class="actions"><button class="btn" id="imp-sample">Try a sample sheet</button><span style="flex:1"></span><button class="btn" data-close>Cancel</button></div>
+  </div>`;
+}
+$('#btn-import').addEventListener('click',openImport);
+function previewRows(rows){
+  const box=$('#imp-preview');
+  if(!rows||rows.length<2){box.innerHTML='<p class="err">I couldn\'t find a heading row plus at least one client row.</p>';return}
+  const head=rows[0], map=head.map(matchHeader);
+  if(!map.includes('name')){box.innerHTML='<p class="err">I couldn\'t find a client name column. Add a heading like "Client name" to the first row.</p>';return}
+  const clients=rows.slice(1).map((r,i)=>{
+    const g=k=>{const ix=map.indexOf(k);return ix<0?'':r[ix]};
+    const loc=parseLoc(g('loc'))||'Pending';
+    const cm=parseCommit(g('commit'));
+    const name=String(g('name')||'').trim();if(!name)return null;
+    return {id:'i'+(state.seq++),name,loc,admitDate:parseDate(g('admitDate')),stepDown:parseDate(g('stepDown')),dcDate:parseDate(g('dcDate')),
+      days:LEVELS.includes(loc)?parseDays(g('days'),loc):[],clinician:String(g('clinician')||'').trim(),caseManager:String(g('caseManager')||'').trim(),psychApn:String(g('psychApn')||'').trim(),
+      referral:String(g('referral')||'').trim(),...cm,housing:/lpd|resid|sober|house|yes/i.test(String(g('housing')))?'LPD':'Commuter',
+      dischargedOn:loc==='Discharged'?(parseDate(g('dcDate'))||TODAY):'',history:[{date:TODAY,text:'Imported from spreadsheet'}]};
+  }).filter(Boolean);
+  pending=clients;
+  const found=Object.keys(FIELD_LABEL).filter(k=>map.includes(k)), missing=Object.keys(FIELD_LABEL).filter(k=>!map.includes(k)&&k!=='freq');
+  box.innerHTML=`<p><b style="color:var(--ink)">${clients.length} clients found.</b> Columns matched:</p>
+    <div class="maplist">${found.map(k=>`<span>${FIELD_LABEL[k]}</span>`).join('')}${missing.map(k=>`<span class="miss">No ${FIELD_LABEL[k]}</span>`).join('')}</div>
+    <div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>Client</th><th>LOC</th><th>Admitted</th><th>Schedule</th><th>Clinician</th><th>Housing</th></tr></thead>
+    <tbody>${clients.slice(0,5).map(c=>`<tr><td>${esc(c.name)}</td><td>${c.loc}</td><td class="mono">${fmt(c.admitDate)}</td><td>${c.days.map(d=>DAY_SHORT[d]).join(' ')||'—'}</td><td>${esc(c.clinician)||'—'}</td><td>${c.housing}</td></tr>`).join('')}</tbody></table></div>
+    ${clients.length>5?`<p>…and ${clients.length-5} more.</p>`:''}
+    <div class="actions" style="margin-top:10px"><button class="btn primary" id="imp-add">Add ${clients.length} to census</button><button class="btn" id="imp-replace">Replace census with these ${clients.length}</button></div>`;
+}
+function readRows(input){
+  if(window.XLSX){
+    const wb=typeof input==='string'?XLSX.read(input,{type:'string',cellDates:true}):XLSX.read(input,{type:'array',cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}).filter(r=>r.some(x=>String(x).trim()));
+  }
+  if(typeof input!=='string')throw new Error('Excel files need a connection to load the reader. Save the sheet as CSV and try again.');
+  return parseCsv(input);
+}
+function handleFile(f){
+  const r=new FileReader();
+  const isText=/\.(csv|tsv|txt)$/i.test(f.name);
+  r.onload=()=>{try{previewRows(isText?parseCsv(r.result):readRows(new Uint8Array(r.result)))}catch(err){$('#imp-preview').innerHTML=`<p class="err">${esc(err.message||'That file could not be read.')}</p>`}};
+  isText?r.readAsText(f):r.readAsArrayBuffer(f);
+}
+document.addEventListener('change',e=>{if(e.target.id==='imp-file'&&e.target.files[0])handleFile(e.target.files[0])});
+document.addEventListener('input',e=>{if(e.target.id==='imp-paste'){const v=e.target.value;if(v.trim())previewRows(parseCsv(v))}});
+document.addEventListener('dragover',e=>{const dz=e.target.closest?.('#dz');if(dz){e.preventDefault();dz.classList.add('over')}});
+document.addEventListener('dragleave',e=>{e.target.closest?.('#dz')?.classList.remove('over')});
+document.addEventListener('drop',e=>{const dz=e.target.closest?.('#dz');if(dz){e.preventDefault();dz.classList.remove('over');const f=e.dataTransfer.files[0];if(f)handleFile(f)}});
+document.addEventListener('click',e=>{
+  if(e.target.id==='imp-sample'){
+    const t=`Client name,Admission date,Projected step-down date,Projected DC date,LOC,Frequency,Attendance schedule,Clinician,Case manager,Psych APN,Referral source,Incoming commitment,LPD or commuter
+Sample Person A,${fmt2(-10)},${fmt2(11)},${fmt2(45)},PHP,5x,M-F,R. Patel LCSW,T. Nguyen,L. Moreau PMHNP,Detox center,PHP 3 wks IOP 4 wks,LPD
+Sample Person B,${fmt2(-25)},${fmt2(6)},${fmt2(30)},IOP,3x,M W Th,M. Okafor LPC,K. Brooks,A. Castillo PMHNP,EAP,IOP 6 wks,Commuter
+Sample Person C,${fmt2(3)},,,Pending,,,J. Lindqvist LMFT,S. Haddad,L. Moreau PMHNP,Hospital ED,PHP 4 wks,LPD`;
+    $('#imp-paste').value=t;previewRows(parseCsv(t));
+  }
+  if((e.target.id==='imp-add'||e.target.id==='imp-replace')&&pending){
+    snap();const n=pending.length;
+    if(e.target.id==='imp-replace')state.clients=pending;else state.clients.push(...pending);
+    pending=null;save();closeLayer();render();toast(`Imported ${n} clients.`,true);
+  }
+});
+function fmt2(n){const d=pISO(addDays(TODAY,n));return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`}
+
+/* ---------- routing ---------- */
+function route(){const h=location.hash.slice(1);view=['board','schedule','table'].includes(h)?h:'board';render()}
+addEventListener('hashchange',route);
+route();
+})();
+</script>
