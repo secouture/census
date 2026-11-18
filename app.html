@@ -131,6 +131,14 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .chip .lv{margin-left:auto;font-size:10.5px;color:var(--c);font-weight:600}
 .chip .h{font-size:10px;color:var(--php);font-weight:600}
 .chip.dragging{opacity:.35}
+.wkbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px}
+.seg.wk{display:inline-flex}
+.seg.wk button{padding:6px 14px;white-space:nowrap}
+.wknav{display:flex;gap:4px}
+.wknav .btn{min-width:34px}
+.wknav .btn[disabled]{opacity:.5;cursor:default}
+.wkrange{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.week.three{grid-template-columns:repeat(3,minmax(200px,1fr))}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--muted);margin:0 0 10px}
 .legend span{display:inline-flex;gap:6px;align-items:center}
 
@@ -264,6 +272,7 @@ table.arch td{white-space:normal}
 @media (max-width:760px){
   .board{grid-template-columns:1fr;overflow:visible}
   .week{grid-template-columns:1fr 1fr;overflow:visible}
+  .week.three{grid-template-columns:1fr}
   .brand h1{font-size:21px}
   .filters input{max-width:none}
 }
@@ -586,7 +595,22 @@ function renderAttention(list){
   items.sort((a,b)=>sev[a.f.lvl]-sev[b.f.lvl]||a.c.name.localeCompare(b.c.name));
   return `<section class="attn"><h2>Needs attention</h2>${items.length?`<ul>${items.map(({c,f})=>`<li><button data-open="${c.id}"><span class="flag ${f.lvl}" style="padding:0;background:none">${esc(f.text)}</span>${esc(c.name)} · ${c.loc}</button></li>`).join('')}</ul>`:'<p class="empty">Nothing due in the next few days.</p>'}</section>`;
 }
-function weekDates(){const d=pISO(TODAY);const dow=(d.getDay()+6)%7;const mon=addDays(TODAY,-dow);return DAYS.map((k,i)=>({k,date:addDays(mon,i)}))}
+/* Week view range: full week = Mon–Sat; 3-day = the next 3 program days from today (Sundays skipped). Arrows shift the range. */
+let weekMode=(()=>{try{return localStorage.getItem('census-weekmode')||'full'}catch(e){return 'full'}})(), weekShift=0;
+function weekDates(){
+  if(weekMode==='full'){const d=pISO(TODAY);const dow=(d.getDay()+6)%7;const mon=addDays(TODAY,-dow+7*weekShift);return DAYS.map((k,i)=>({k,date:addDays(mon,i)}))}
+  const prog=[];let d=TODAY;const need=3*(Math.abs(weekShift)+1);const step=weekShift<0?-1:1;
+  if(dayKey(d)==='sun')d=addDays(d,1);
+  if(weekShift<0){let x=addDays(d,-1);while(prog.length<3*-weekShift){if(dayKey(x)!=='sun')prog.unshift(x);x=addDays(x,-1)}return prog.slice(0,3).map(date=>({k:dayKey(date),date}))}
+  while(prog.length<need){if(dayKey(d)!=='sun')prog.push(d);d=addDays(d,1)}
+  return prog.slice(-3).map(date=>({k:dayKey(date),date}));
+}
+function weekControls(){
+  const ds=weekDates();
+  return `<div class="wkbar"><div class="seg wk" role="group" aria-label="Range">${[['3','3-day'],['full','Full week']].map(([v,l])=>`<button type="button" data-wmode="${v}" aria-pressed="${weekMode===v}">${l}</button>`).join('')}</div>
+    <div class="wknav"><button class="btn small" data-wshift="-1" aria-label="Earlier">‹</button><button class="btn small" data-wshift="0" ${weekShift===0?'disabled':''}>Today</button><button class="btn small" data-wshift="1" aria-label="Later">›</button></div>
+    <span class="wkrange">${fmt(ds[0].date)} – ${fmt(ds[ds.length-1].date)}</span></div>`;
+}
 function renderSchedule(){
   const list=state.clients.filter(c=>LEVELS.includes(c.loc)&&visible(c));
   const legend=`<div class="legend">${GROUPS.map(g=>`<span><span class="swatch" style="background:var(${GROUP_VAR[g]})"></span>${g}</span>`).join('')}<span>Drag a name to another day or time block to change that client's schedule. PC is all day only, and evening groups run Mon, Tue and Thu only. Click a name for details.</span></div>`;
@@ -602,7 +626,7 @@ function renderSchedule(){
         ${ss.map(c=>`<button class="chip" style="--c:${cvar(c.loc)}" data-drag="sched" data-id="${c.id}" data-day="${k}" title="${esc(c.name)}"><span class="dot"></span><span class="cn">${esc(c.name)}</span><span class="tags">${c.housing==='LPD'?'<span class="h">LPD</span>':''}<span class="lv">${c.loc}</span></span></button>`).join('')}</div>`}).join('')}
     </section>`;
   }).join('');
-  return legend+`<div class="week">${cols}</div>`;
+  return weekControls()+legend+`<div class="week ${weekMode==='3'?'three':''}">${cols}</div>`;
 }
 const COLS=[
   ['name','Client',c=>c.name],['alert','Alerts',c=>{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return f.length?sev[f[0].lvl]:9}],
@@ -928,6 +952,8 @@ document.addEventListener('click',e=>{
   if(t.id==='sched-save'){saveSched();return}
   const q=t.closest('[data-dcq]');if(q&&c){c[q.dataset.dcq]=q.dataset.v;save();render();return}
   const sb=t.closest('[data-sb]');if(sb){const ctx=sb.dataset.ctx;pickerSet(ctx==='edit'?schedDraft:planDraft[+ctx],sb.dataset.sd,sb.dataset.sb);ctx==='edit'?renderSched():renderPlanner();return}
+  const wm=t.closest('[data-wmode]');if(wm){weekMode=wm.dataset.wmode;weekShift=0;try{localStorage.setItem('census-weekmode',weekMode)}catch(e){}render();return}
+  const ws=t.closest('[data-wshift]');if(ws){const v=+ws.dataset.wshift;weekShift=v===0?0:weekShift+v;render();return}
   const sc=t.closest('[data-sched]');if(sc){openSched(sc.dataset.sched);return}
   const opener=t.closest('[data-open],[data-drag]');
   if(opener&&!t.closest('.drawer')&&!t.closest('.modal')){openClient(opener.dataset.open||opener.dataset.id);return}
