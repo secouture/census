@@ -281,7 +281,7 @@ table.census tr.dc td{color:var(--muted)}
 /* ---------- constants ---------- */
 const DAYS=['mon','tue','wed','thu','fri','sat'];
 const DAY_LABEL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat'};
-const DAY_SHORT={mon:'M',tue:'T',wed:'W',thu:'Th',fri:'F',sat:'Sa'};
+const DAY_SHORT={mon:'M',tue:'Tu',wed:'W',thu:'Th',fri:'F',sat:'Sa'};
 /* LOC carries the frequency: PC6 = partial care 6 days/wk, IOP4 = IOP 4 days/wk, EIOP = evening IOP. */
 const LEVELS=['PC6','PC5','IOP6','IOP5','IOP4','IOP3','EIOP','OP'];
 const LOCS=['Pending',...LEVELS,'Discharged'];
@@ -295,7 +295,15 @@ const M6=['mon','tue','wed','thu','fri','sat'],M5=['mon','tue','wed','thu','fri'
 const DEFAULT_DAYS={Pending:[],PC6:M6,PC5:M5,IOP6:M6,IOP5:M5,IOP4:['mon','tue','wed','thu'],IOP3:['mon','tue','thu'],EIOP:['mon','tue','thu'],OP:['tue'],Discharged:[]};
 const DEFAULT_LOS={PHP:21,IOP:28};
 const OP_TO_DC=42;
-const KEY='census-prototype-v4';
+const KEY='census-prototype-v5';
+/* Projected DC from incoming commitment: admission date is day 1, so the last day is admit + LOS - 1.
+   A Saturday moves back to Friday; a Sunday moves forward to Monday. */
+function calcDc(admit,los){
+  if(!admit||!los)return '';
+  let d=addDays(admit,los-1);const w=pISO(d).getDay();
+  if(w===6)d=addDays(d,-1);else if(w===0)d=addDays(d,1);
+  return d;
+}
 /* Time blocks: PC meets all day; IOP and OP pick a block per day; EIOP is fixed Mon/Tue/Thu evenings. */
 const BLOCKS={ALL:{n:'All day',t:'9–3:30'},AM:{n:'Daytime',t:'9–12'},PM:{n:'Afternoon',t:'12:30–3:30'},EVE:{n:'Evening',t:'6–9pm'}};
 const BLOCK_ORDER=['ALL','AM','PM','EVE'];
@@ -371,7 +379,7 @@ function sample(){
     (LATER[r[0]]||[]).forEach(([l,o])=>plans.push({date:addDays(TODAY,o),loc:l,days:[...DEFAULT_DAYS[l]],blocks:normBlocks(l,DEFAULT_DAYS[l],uniform(DEFAULT_DAYS[l],'PM'))}));
     return {
     id:'c'+(i+1), name:r[0], loc:r[1], plans, admitDate:addDays(TODAY,r[2]),
-    dcDate:r[4]==null?'':addDays(TODAY,r[4]),
+    dcDate:r[1]==='Discharged'?addDays(TODAY,r[4]):calcDc(addDays(TODAY,r[2]),r[10]),
     days:D(r[5]), clinician:CLIN[r[6]], caseManager:CM[r[7]], psychApn:APN[r[8]],
     referral:r[9], commitDays:r[10], commitNote:r[11], housing:r[12],
     dischargedOn:r[13]==null?'':addDays(TODAY,r[13]),
@@ -605,7 +613,7 @@ function renderDrawer(){
         <div class="fld"><span class="lbl">Housing</span><div class="seg">${['LPD','Commuter'].map(h=>`<button type="button" data-house="${h}" aria-pressed="${c.housing===h}">${h}</button>`).join('')}</div></div>
         <div class="fld"><label for="d-admit">Admission date</label><input id="d-admit" type="date" data-f="admitDate" value="${c.admitDate}"></div>
         <div class="fld"><span class="lbl">Projected step-down</span>${c.loc==='Discharged'?'<span class="of">n/a</span>':`<button type="button" class="plan-link boxed" data-plan="${c.id}">${nextPlan(c)?`${fmt(nextPlan(c).date)} → ${nextPlan(c).loc}${c.plans.length>1?` (+${c.plans.length-1})`:''}`:'+ Schedule a change'}</button>`}</div>
-        <div class="fld"><label for="d-dc">Projected DC</label><input id="d-dc" type="date" data-f="dcDate" value="${c.dcDate}"></div>
+        <div class="fld"><label for="d-dc">Projected DC</label><input id="d-dc" type="date" data-f="dcDate" value="${c.dcDate}"><span class="help">Set from admission + LOS, kept off weekends. You can change it.</span></div>
         ${c.loc==='Discharged'?`<div class="fld"><label for="d-dco">Discharged on</label><input id="d-dco" type="date" data-f="dischargedOn" value="${c.dischargedOn}"></div>`:''}
         ${LEVELS.includes(c.loc)?`<div class="fld full"><span class="lbl">Schedule · ${freq(c)}</span><button type="button" class="plan-link boxed" data-sched="${c.id}">${schedHTML(c)||'+ Set days and times'}</button></div>`:''}
       </div>
@@ -631,7 +639,9 @@ function renderDrawer(){
 function setField(c,f,v){
   if(f==='commitDays')v=parseInt(v,10)||0;
   if(f==='name'&&!v.trim())return;
-  c[f]=v;save();
+  c[f]=v;
+  if((f==='commitDays'||f==='admitDate')&&c.loc!=='Discharged'&&c.commitDays&&c.admitDate){c.dcDate=calcDc(c.admitDate,c.commitDays)}
+  save();
   const keepFocus=document.activeElement?.id;
   renderStats();renderStaffFilter();
   $('#view').innerHTML=view==='schedule'?renderSchedule():renderCensus();
@@ -956,7 +966,7 @@ function previewRows(rows){
     const st=String(g('days')).toLowerCase(), hint=/6\s*-\s*9|eve|night/.test(st)?'EVE':/12:30|after|pm/.test(st)?'PM':'AM';
     const dd=LEVELS.includes(loc)?parseDays(g('days'),loc):[];
     if(plans[0])plans[0].blocks=normBlocks(plans[0].loc,plans[0].days,{});
-    return {id:'i'+(state.seq++),name,loc,plans,blocks:normBlocks(loc,dd,uniform(dd,hint)),admitDate:parseDate(g('admitDate')),dcDate:parseDate(g('dcDate')),
+    return {id:'i'+(state.seq++),name,loc,plans,blocks:normBlocks(loc,dd,uniform(dd,hint)),admitDate:parseDate(g('admitDate')),dcDate:parseDate(g('dcDate'))||(loc!=='Discharged'?calcDc(parseDate(g('admitDate')),cm.commitDays):''),
       days:dd,clinician:String(g('clinician')||'').trim(),caseManager:String(g('caseManager')||'').trim(),psychApn:String(g('psychApn')||'').trim(),
       referral:String(g('referral')||'').trim(),...cm,housing:/lpd|resid|sober|house|yes/i.test(String(g('housing')))?'LPD':'Commuter',
       dischargedOn:loc==='Discharged'?(parseDate(g('dcDate'))||TODAY):'',history:[{date:TODAY,text:'Imported from spreadsheet'}]};
