@@ -356,6 +356,15 @@ table.arch td{white-space:normal}
 .maplist span.miss{color:var(--warn)}
 .err{color:var(--crit)!important}
 
+/* Row alert bell */
+.al-td{text-align:center;width:1%}
+.row-bell{border:0;background:color-mix(in srgb,#e0a400 16%,transparent);color:#b98500;border-radius:7px;padding:4px 6px;display:inline-flex;cursor:pointer;line-height:0}
+.row-bell:hover{background:color-mix(in srgb,#e0a400 28%,transparent)}
+#rowpop{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.18);padding:10px 12px;display:flex;flex-direction:column;gap:6px;max-width:300px;min-width:200px}
+#rowpop .rp-h{font-weight:700;font-size:13px}
+#rowpop .flag{align-self:flex-start}
+#rowpop .rp-open{border:0;background:none;color:var(--accent);font-weight:600;font-size:12.5px;padding:2px 0 0;text-align:left;cursor:pointer}
+
 /* Settings */
 .settings{display:flex;flex-direction:column;gap:14px;max-width:980px}
 .set-h{font-family:var(--f-display);font-size:20px;margin:6px 0 0}
@@ -743,6 +752,19 @@ function weekEvents(){
   const ord={adm:0,loc:1,dc:2};days.forEach(d=>d.ev.sort((a,b)=>ord[a.t]-ord[b.t]||a.c.name.localeCompare(b.c.name)));
   return {mon,sat,days};
 }
+/* Small pop-up beside a row's bell listing that client's alerts */
+function showRowPop(btn){
+  $('#rowpop')?.remove();
+  const c=byId(btn.dataset.rowbell);if(!c)return;
+  const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);
+  const el=document.createElement('div');el.id='rowpop';el.dataset.id=c.id;el.setAttribute('role','dialog');el.setAttribute('aria-label',`Alerts for ${c.name}`);
+  el.innerHTML=`<div class="rp-h">${esc(c.name)}</div>${f.map(x=>`<div class="flag ${x.lvl}">${esc(x.text)}</div>`).join('')}<button type="button" class="rp-open" data-open="${c.id}">Open client card →</button>`;
+  document.body.appendChild(el);
+  const r=btn.getBoundingClientRect(), w=el.offsetWidth, h=el.offsetHeight;
+  let x=Math.min(r.left,innerWidth-w-12), y=r.bottom+6; if(y+h>innerHeight-8)y=Math.max(8,r.top-h-6);
+  el.style.left=Math.max(8,x)+'px';el.style.top=y+'px';
+}
+addEventListener('scroll',()=>$('#rowpop')?.remove(),true);
 function renderSettings(){
   const all=[...state.clients];
   const cnt=(k,n)=>all.filter(c=>c[k]===n&&c.loc!=='Discharged').length;
@@ -817,7 +839,7 @@ function sortedRows(){
 function cell(c,k){
   switch(k){
     case 'name':return `<td class="nm"><button class="linkish" data-open="${c.id}">${esc(c.name)}</button></td>`;
-    case 'alert':{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return `<td>${f.length?`<span class="flag ${f[0].lvl}">${esc(f[0].text)}${f.length>1?` +${f.length-1}`:''}</span>`:''}</td>`}
+    case 'alert':{const f=flags(c);return `<td class="al-td">${f.length?`<button type="button" class="row-bell" data-rowbell="${c.id}" aria-label="${f.length} alert${f.length>1?'s':''} for ${esc(c.name)}" title="${esc(f.map(x=>x.text).join(' · '))}"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg></button>`:''}</td>`}
     case 'loc':return c.loc==='Discharged'?`<td><span class="loc-sel static">Discharged</span>${c.lastLoc?`<span class="of"> from ${c.lastLoc}</span>`:''}</td>`:`<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
     case 'housing':return `<td><select class="h-sel ${c.housing==='LPD'?'lpd':''}" data-row-house="${c.id}" aria-label="Residence for ${esc(c.name)}"><option ${c.housing==='LPD'?'selected':''}>LPD</option><option ${c.housing!=='LPD'?'selected':''}>Commuter</option></select></td>`;
     case 'admitDate':return `<td class="mono">${fmt(c.admitDate)}</td>`;
@@ -1144,6 +1166,10 @@ document.addEventListener('click',e=>{
   const gt=t.closest('[data-goto-today]');if(gt){e.preventDefault();weekMode='3';weekShift=0;try{localStorage.setItem('census-weekmode','3')}catch(e){}
     if(location.hash!=='#schedule')location.hash='#schedule';else render();
     setTimeout(()=>{const d=document.querySelector('.day.today')||document.querySelector('.week .day');if(d)window.scrollTo({top:Math.max(0,d.getBoundingClientRect().top+scrollY-90),behavior:'smooth'})},60);return}
+  const rbl=t.closest('[data-rowbell]');
+  if(rbl){const open=$('#rowpop');if(open&&open.dataset.id===rbl.dataset.rowbell){open.remove();return}showRowPop(rbl);return}
+  if($('#rowpop')&&!t.closest('#rowpop'))$('#rowpop').remove();
+  if(t.closest('#rowpop [data-open]'))$('#rowpop')?.remove();
   const pb=t.closest('[data-pop]');if(pb){pop=pop===pb.dataset.pop?null:pb.dataset.pop;renderStats();return}
   if(pop&&(!t.closest('#attn-pop')||t.closest('#attn-pop [data-open]'))){pop=null;renderStats()}
   const c=byId(openId);
@@ -1185,6 +1211,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&$('#confirm-slot').innerHTML){closeConfirm();return}
+  if(e.key==='Escape'&&$('#rowpop')){$('#rowpop').remove();return}
   if(e.key==='Escape'&&pop){pop=null;renderStats();return}
   if(e.key==='Escape'&&$('#layer').innerHTML)closeLayerOrPlanner();
   if((e.key==='Enter'||e.key===' ')&&e.target.matches('.card')){e.preventDefault();openClient(e.target.dataset.id)}
