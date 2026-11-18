@@ -141,6 +141,11 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .chip .lv{margin-left:auto;font-size:10.5px;color:var(--c);font-weight:600}
 .chip .h{font-size:10px;color:var(--php);font-weight:600}
 .chip.dragging{opacity:.35}
+/* Full week: one line per client */
+.week:not(.three) .chip{font-size:12px;padding:4px 6px;gap:5px;letter-spacing:-.01em}
+.week:not(.three) .chip .tags{gap:4px}
+.week:not(.three) .chip .lv,.week:not(.three) .chip .h{font-size:9.5px}
+.week:not(.three) .chip .dot{width:6px;height:6px}
 .wkbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px}
 .seg.wk{display:inline-flex}
 .seg.wk button{padding:6px 14px;white-space:nowrap}
