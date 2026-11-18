@@ -998,8 +998,7 @@ function renderCensus(){
   const rows=sortedRows();
   const n=l=>state.clients.filter(c=>group(c.loc)===l&&visible(c)&&recentDc(c)).length;
   const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['Pending','',...shownGroups(),'PDC'].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l==='PDC'?'var(--dc)':l?cvar(l):'var(--accent)'}" title="${{'':'Everyone not incoming',Pending:'Incoming admissions (Pending)',PDC:'Discharges scheduled in the next 14 days'}[l]||''}">${{'':'Active',Pending:'Incoming',PDC:'Pending DC'}[l]||l} <span>${l==='PDC'?state.clients.filter(c=>visible(c)&&pendingDc(c)).length:l?n(l):state.clients.filter(c=>visible(c)&&recentDc(c)&&c.loc!=='Pending').length}</span></button>`).join('')}</div>`;
-  return `<div class="tbar">${chips}<p>Change LOC right in the row. Click a name for full details.</p>
-    <button class="btn small" id="btn-copy">Copy as spreadsheet (CSV)</button></div>
+  return `<div class="tbar">${chips}<p>Change LOC right in the row. Click a name for full details.</p></div>
   <div class="tablewrap scroll"><table class="census"><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
   <tbody>${rows.map(c=>`<tr style="--c:${cvar(c.loc)}" class="${isDC(c)?'dc':''}">${COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="${COLS.length}" class="of">No clients match these filters.</td></tr>`}</tbody></table></div>`;
 }
@@ -1054,8 +1053,7 @@ function renderArchive(){
   return `<div class="tbar"><div class="locfilter" role="group" aria-label="Archive list">
       <button data-arch-kind="discharge" aria-pressed="${archKind==='discharge'}" style="--c:var(--dc)">Discharges <span>${n('discharge')}</span></button>
       <button data-arch-kind="incomplete" aria-pressed="${archKind==='incomplete'}" style="--c:var(--pend)">Incomplete admissions <span>${n('incomplete')}</span></button></div>
-    <p>${archKind==='incomplete'?'Clients removed while still Pending with no discharge date.':'Clients removed from the census after discharge.'} Restore puts a client back on the census.</p>
-    <button class="btn small" id="btn-copy-arch">Copy this list (CSV)</button></div>
+    <p>${archKind==='incomplete'?'Clients removed while still Pending with no discharge date.':'Clients removed from the census after discharge.'} Restore puts a client back on the census.</p></div>
   <div class="tablewrap scroll"><table class="census arch"><thead><tr>${ARCH_COLS.map(([,l])=>`<th>${l}</th>`).join('')}<th></th></tr></thead>
   <tbody>${rows.map(r=>`<tr style="--c:var(${r.kind==='incomplete'?'--pend':'--dc'})">${ARCH_COLS.map(([k])=>`<td>${cell(r,k)}</td>`).join('')}<td><button class="btn small" data-restore="${r.id}">Restore</button></td></tr>`).join('')||`<tr><td colspan="${ARCH_COLS.length+1}" class="of">Nothing archived here yet.</td></tr>`}</tbody></table></div>`;
 }
