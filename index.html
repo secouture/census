@@ -217,7 +217,10 @@ button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px 
 .week:not(.three) .chip .tags{gap:4px}
 .week:not(.three) .chip .lv,.week:not(.three) .chip .h{font-size:9.5px}
 .week:not(.three) .chip .dot{width:6px;height:6px}
-.wkbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px}
+.wkbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin:0 0 10px}
+.wkmid{display:flex;align-items:center;gap:10px;justify-self:center}
+.wkbar .seg.wk{justify-self:end}
+@media (max-width:560px){.wkbar{grid-template-columns:1fr}.wkspace{display:none}.wkmid,.wkbar .seg.wk{justify-self:center}.wkbar .seg.wk{grid-row:1}}
 .seg.wk{display:inline-flex}
 .seg.wk button{padding:6px 14px;white-space:nowrap}
 .wknav{display:flex;gap:4px}
@@ -769,9 +772,10 @@ function weekDates(){
 }
 function weekControls(){
   const ds=weekDates();
-  return `<div class="wkbar"><div class="seg wk" role="group" aria-label="Range">${[['3','3-day'],['full','Full week']].map(([v,l])=>`<button type="button" data-wmode="${v}" aria-pressed="${weekMode===v}">${l}</button>`).join('')}</div>
-    <div class="wknav"><button class="btn small" data-wshift="-1" aria-label="Earlier">‹</button><button class="btn small" data-wshift="0" ${weekShift===0?'disabled':''}>Today</button><button class="btn small" data-wshift="1" aria-label="Later">›</button></div>
-    <span class="wkrange">${fmt(ds[0].date)} – ${fmt(ds[ds.length-1].date)}</span></div>`;
+  return `<div class="wkbar"><span class="wkspace"></span>
+    <div class="wkmid"><div class="wknav"><button class="btn small" data-wshift="-1" aria-label="Earlier">‹</button><button class="btn small" data-wshift="0" ${weekShift===0?'disabled':''}>Today</button><button class="btn small" data-wshift="1" aria-label="Later">›</button></div>
+    <span class="wkrange">${fmt(ds[0].date)} – ${fmt(ds[ds.length-1].date)}</span></div>
+    <div class="seg wk" role="group" aria-label="Range">${[['3','3-day'],['full','Full week']].map(([v,l])=>`<button type="button" data-wmode="${v}" aria-pressed="${weekMode===v}">${l}</button>`).join('')}</div></div>`;
 }
 function renderSchedule(){
   const list=state.clients.filter(c=>LEVELS.includes(c.loc)&&visible(c));
