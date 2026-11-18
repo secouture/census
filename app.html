@@ -410,7 +410,7 @@ table.arch td:first-child{white-space:nowrap}
 .set-prog .pm-dot{width:26px;height:26px;font-size:9.5px}
 .set-note{margin:0;color:var(--muted);font-size:13px}
 .sched-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
-.sched-grid h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.set-card h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
 .set-tbl{width:auto;font-size:13px}
 .set-tbl th,.set-tbl td{padding:4px 8px;border-bottom:1px solid var(--line);position:static;background:none;cursor:default;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}
 .set-tbl tr.hd td{font-size:11px;font-weight:600;color:var(--muted);text-align:center}
@@ -418,6 +418,7 @@ table.arch td:first-child{white-space:nowrap}
 .set-tbl.days td{text-align:center}
 .set-tbl input[type=time]{border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--surface)}
 .daypick{display:flex;flex-wrap:wrap;gap:6px}
+.locpick label b{color:var(--c)}
 .daypick label{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:8px;padding:4px 9px;background:var(--surface);font-size:13px;cursor:pointer}
 .settings{display:flex;flex-direction:column;gap:14px;max-width:980px}
 .set-h{font-family:var(--f-display);font-size:20px;margin:6px 0 0}
@@ -547,13 +548,18 @@ const allowedBlocks=loc=>/^PC/.test(loc)?['ALL']:['AM','PM','EVE'];
 const EVE_DAYS=['mon','tue','thu'];
 /* Per-program schedule settings (Settings page). Stored in each program's own data as state.sched. */
 const SCHED_DEFAULT=()=>({hours:{ALL:['09:00','15:30'],AM:['09:00','12:00'],PM:['12:30','15:30'],EVE:['18:00','21:00']},eveDays:['mon','tue','thu'],
-  days:{PC6:[...M6],PC5:[...M5],IOP6:[...M6],IOP5:[...M5],IOP4:['mon','tue','wed','thu'],IOP3:['mon','tue','thu'],EIOP:['mon','tue','thu'],OP:['tue']}});
+  locs:[...LEVELS],days:{PC6:[...M6],PC5:[...M5],IOP6:[...M6],IOP5:[...M5],IOP4:['mon','tue','wed','thu'],IOP3:['mon','tue','thu'],EIOP:['mon','tue','thu'],OP:['tue']}});
 const tShort=v=>{const [h,m]=v.split(':').map(Number);return m?`${h%12||12}:${String(m).padStart(2,'0')}`:`${h%12||12}`};
 const blockLabel=([a,b])=>`${tShort(a)}–${tShort(b)}${+b.split(':')[0]>=17?'pm':''}`;
 const words=a=>a.length<2?a.join(''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
 const eveWords=()=>EVE_DAYS.length?words(EVE_DAYS.map(d=>DAY_LABEL[d])):'no days';
+const locOn=l=>!state.sched||!state.sched.locs||state.sched.locs.includes(l);
+/* LOCs offered in this program, plus the client's own LOC so a turned-off level never disappears from their row. */
+const pickLocs=cur=>['Pending',...LEVELS.filter(l=>locOn(l)||l===cur)];
+/* Group chips/pills shown: groups with an offered LOC, or anyone currently in them. */
+const shownGroups=()=>GROUPS.filter(g=>LEVELS.some(l=>group(l)===g&&locOn(l))||state.clients.some(c=>group(c.loc)===g&&isActive(c)));
 function applySched(){
-  if(!state.sched)state.sched=SCHED_DEFAULT();const c=state.sched;
+  if(!state.sched)state.sched=SCHED_DEFAULT();const c=state.sched;if(!c.locs)c.locs=[...LEVELS];
   BLOCK_ORDER.forEach(k=>{if(c.hours[k])BLOCKS[k].t=blockLabel(c.hours[k])});
   EVE_DAYS.splice(0,EVE_DAYS.length,...DAYS.filter(d=>c.eveDays.includes(d)));
   Object.keys(c.days).forEach(l=>{DEFAULT_DAYS[l]=DAYS.filter(d=>c.days[l].includes(d))});
@@ -800,7 +806,7 @@ function renderStats(){
   const st=(k,v,s,cls='',sw='')=>`<div class="stat ${cls}"><div class="k">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   $('#stats').innerHTML=
     `<button type="button" class="stat add-tile" data-add-client title="Add a client" aria-label="Add client"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="currentColor" d="M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.6-7 4v2h11.1a6 6 0 0 1-.1-1c0-1.9.9-3.6 2.3-4.7A13 13 0 0 0 10 14Zm9 0h-2v3h-3v2h3v3h2v-3h3v-2h-3v-3Z"/></svg><span>Add client</span></button>`+
-    `<div class="stat"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${GROUPS.map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
+    `<div class="stat"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${shownGroups().map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
     `<div class="stat"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${admToday}</div><div class="s">admits today</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DCs today</div></div></div></div>`+
     `<div class="stat"><div class="k">Residence</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
     `<a href="#schedule" class="stat link" data-goto-today title="Open today in the 3-day week view"><div class="k">Expected today</div><div class="v">${tk==='sun'?'—':todayCount}</div><div class="s">${tk==='sun'?'no groups Sunday · ':'scheduled · '}<u>see schedule →</u></div></a>`+
@@ -868,10 +874,12 @@ function renderSettings(){
     <ul>${state.staff[k].map((n,i)=>`<li><input value="${esc(n)}" data-staff-edit="${k}" data-i="${i}" aria-label="${one} name"><span class="cl" title="Active clients assigned">${cnt(k,n)}</span><button type="button" class="x" data-staff-del="${k}" data-i="${i}" aria-label="Remove ${esc(n)}">×</button></li>`).join('')||'<li class="empty">No one yet</li>'}</ul>
     <form class="staff-add" data-staff-add="${k}"><input placeholder="Add ${one.replace('Case','case').replace('Clinician','clinician')}" aria-label="New ${one} name"><button class="btn small" type="submit">Add</button></form></div>`).join('')}</div></section>
   <section class="set-card"><h3>Treatment schedule · ${pn}</h3><p class="help">Group hours and days for this program. Changes apply to schedules you set from now on and to the Schedule page labels; clients' existing days aren't changed.</p>
+  <h4>Levels of care offered</h4><div class="daypick locpick">${LEVELS.map(l=>{const k=state.clients.filter(c=>c.loc===l&&isActive(c)).length;return `<label style="--c:${cvar(l)}"><input type="checkbox" data-locon="${l}" ${locOn(l)?'checked':''}><b>${l}</b>${k&&!locOn(l)?`<span class="of">${k} still in it</span>`:''}</label>`}).join('')}</div>
+  <p class="help" style="margin:6px 0 16px">Only checked levels show in the LOC dropdowns, step-down plans and census filters for ${pn}. Turning one off doesn't move anyone: clients already in it keep it until you change them.</p>
   <div class="sched-grid">
    <div><h4>Group hours</h4><table class="set-tbl"><tbody>${BLOCK_ORDER.map(k=>`<tr><th>${BL[k]}</th><td><input type="time" step="900" value="${sc.hours[k][0]}" data-sh="${k}" data-i="0" aria-label="${BL[k]} start"> – <input type="time" step="900" value="${sc.hours[k][1]}" data-sh="${k}" data-i="1" aria-label="${BL[k]} end"></td><td class="of">${BLOCKS[k].t}</td></tr>`).join('')}</tbody></table>
     <h4 style="margin-top:14px">Evening groups run on</h4><div class="daypick">${DAYS.map(d=>`<label><input type="checkbox" data-eve="${d}" ${sc.eveDays.includes(d)?'checked':''}>${DAY_SHORT[d]}</label>`).join('')}</div></div>
-   <div><h4>Default days by LOC</h4><table class="set-tbl days"><tbody><tr class="hd"><td></td>${DAYS.map(d=>`<td>${DAY_SHORT[d]}</td>`).join('')}</tr>${LEVELS.map(l=>`<tr><th style="color:${cvar(l)}">${l}${CUSTOM_DAYS.includes(l)?' <span class="of">varies</span>':''}</th>${DAYS.map(d=>`<td><input type="checkbox" data-dd="${l}" data-day="${d}" ${sc.days[l].includes(d)?'checked':''} aria-label="${l} ${DAY_LABEL[d]}"></td>`).join('')}</tr>`).join('')}</tbody></table>
+   <div><h4>Default days by LOC</h4><table class="set-tbl days"><tbody><tr class="hd"><td></td>${DAYS.map(d=>`<td>${DAY_SHORT[d]}</td>`).join('')}</tr>${LEVELS.filter(locOn).map(l=>`<tr><th style="color:${cvar(l)}">${l}${CUSTOM_DAYS.includes(l)?' <span class="of">varies</span>':''}</th>${DAYS.map(d=>`<td><input type="checkbox" data-dd="${l}" data-day="${d}" ${sc.days[l].includes(d)?'checked':''} aria-label="${l} ${DAY_LABEL[d]}"></td>`).join('')}</tr>`).join('')}</tbody></table>
     <p class="help" style="margin-top:6px">Used when a client moves to that LOC. You can still change any client's days on their card.</p></div>
   </div></section>
   <section class="set-card"><h3>Import spreadsheet</h3><p class="help">Bring in clients from an Excel (.xlsx) or CSV file, or paste rows copied from Excel. Columns are matched by their headings and you see a preview before anything is added. New staff names in the file are added to the staff lists.</p>
@@ -913,7 +921,7 @@ function renderSchedule(){
     return `<section class="day ${date===TODAY?'today':''}" aria-label="${DAY_LABEL[k]}">
       <div class="day-h"><span class="dn">${DAY_LABEL[k]}</span><span class="dd">${fmt(date)}${date===TODAY?' · today':''}</span>
         <div class="cnt"><b>${cs.length}</b> expected</div>
-        <div class="pills">${GROUPS.map(g=>`<span class="pill ${by(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})">${g} <b>${by(g)}</b></span>`).join('')}<span class="pill lpd ${lpd?'':'zero'}">LPD <b>${lpd}</b></span></div>
+        <div class="pills">${shownGroups().map(g=>`<span class="pill ${by(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})">${g} <b>${by(g)}</b></span>`).join('')}<span class="pill lpd ${lpd?'':'zero'}">LPD <b>${lpd}</b></span></div>
         <div class="mix">${mix}</div></div>
       ${BLOCK_ORDER.filter(b=>b!=='EVE'||EVE_DAYS.includes(k)).map(b=>{const ss=cs.filter(c=>blk(c,k)===b);return `<div class="ses" data-drop="day" data-day="${k}" data-block="${b}"><div class="ses-h">${BLOCKS[b].n} <span class="t">${BLOCKS[b].t}</span><span class="n">${ss.length}</span></div>
         ${ss.map(c=>`<button class="chip" style="--c:${cvar(c.loc)}" data-drag="sched" data-id="${c.id}" data-day="${k}" title="${esc(c.name)}"><span class="dot"></span><span class="cn">${esc(c.name)}</span><span class="tags">${c.housing==='LPD'?'<span class="h">LPD</span>':''}<span class="lv">${c.loc}</span></span></button>`).join('')}</div>`}).join('')}
@@ -940,7 +948,7 @@ function cell(c,k){
   switch(k){
     case 'name':return `<td class="nm"><button class="linkish" data-open="${c.id}">${esc(c.name)}</button></td>`;
     case 'alert':{const f=flags(c);return `<td class="al-td">${f.length?`<button type="button" class="row-bell" data-rowbell="${c.id}" aria-label="${f.length} alert${f.length>1?'s':''} for ${esc(c.name)}" title="${esc(f.map(x=>x.text).join(' · '))}"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg></button>`:''}</td>`}
-    case 'loc':return isDC(c)?`<td><span class="loc-sel static" style="--c:${cvar(c.loc)}">${c.loc}</span><span class="of"> · discharged</span></td>`:`<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
+    case 'loc':return isDC(c)?`<td><span class="loc-sel static" style="--c:${cvar(c.loc)}">${c.loc}</span><span class="of"> · discharged</span></td>`:`<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${pickLocs(c.loc).map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
     case 'housing':return `<td><select class="h-sel ${c.housing==='LPD'?'lpd':''}" data-row-house="${c.id}" aria-label="Residence for ${esc(c.name)}"><option ${c.housing==='LPD'?'selected':''}>LPD</option><option ${c.housing!=='LPD'?'selected':''}>Commuter</option></select></td>`;
     case 'admitDate':return `<td class="mono">${fmt(c.admitDate)}</td>`;
     case 'los':return `<td class="mono">${losDays(c)||'—'}</td>`;
@@ -955,7 +963,7 @@ function cell(c,k){
 function renderCensus(){
   const rows=sortedRows();
   const n=l=>state.clients.filter(c=>group(c.loc)===l&&visible(c)&&recentDc(c)).length;
-  const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['Pending','',...GROUPS,'PDC'].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l==='PDC'?'var(--dc)':l?cvar(l):'var(--accent)'}" title="${{'':'Everyone not incoming',Pending:'Incoming admissions (Pending)',PDC:'Discharges scheduled in the next 14 days'}[l]||''}">${{'':'Active',Pending:'Incoming',PDC:'Pending DC'}[l]||l} <span>${l==='PDC'?state.clients.filter(c=>visible(c)&&pendingDc(c)).length:l?n(l):state.clients.filter(c=>visible(c)&&recentDc(c)&&c.loc!=='Pending').length}</span></button>`).join('')}</div>`;
+  const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['Pending','',...shownGroups(),'PDC'].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l==='PDC'?'var(--dc)':l?cvar(l):'var(--accent)'}" title="${{'':'Everyone not incoming',Pending:'Incoming admissions (Pending)',PDC:'Discharges scheduled in the next 14 days'}[l]||''}">${{'':'Active',Pending:'Incoming',PDC:'Pending DC'}[l]||l} <span>${l==='PDC'?state.clients.filter(c=>visible(c)&&pendingDc(c)).length:l?n(l):state.clients.filter(c=>visible(c)&&recentDc(c)&&c.loc!=='Pending').length}</span></button>`).join('')}</div>`;
   return `<div class="tbar">${chips}<p>Change LOC right in the row. Click a name for full details.</p>
     <button class="btn small" id="btn-copy">Copy as spreadsheet (CSV)</button></div>
   <div class="tablewrap scroll"><table class="census"><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
@@ -1088,7 +1096,7 @@ function renderDrawer(){
       <div class="summary">${fl.map(f=>`<span class="flag ${f.lvl}">${esc(f.text)}</span>`).join('')}${los?`<span class="flag info">Day ${los}${c.commitDays?` of ${c.commitDays}`:''}</span>`:''}</div>
       <div class="grid2">
         <div class="fld full"><label for="d-name">Client name</label><input id="d-name" data-f="name" value="${esc(c.name)}"></div>
-        <div class="fld"><label for="d-loc">Level of care</label>${isDC(c)?`<input id="d-loc" value="${c.loc} · discharged ${fmt(c.dischargedOn)}" disabled><span class="help">Clear the date of discharge to return the client to active care.</span>`:`<select id="d-loc" data-loc-select>${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select>`}</div>
+        <div class="fld"><label for="d-loc">Level of care</label>${isDC(c)?`<input id="d-loc" value="${c.loc} · discharged ${fmt(c.dischargedOn)}" disabled><span class="help">Clear the date of discharge to return the client to active care.</span>`:`<select id="d-loc" data-loc-select>${pickLocs(c.loc).map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select>`}</div>
         <div class="fld"><span class="lbl">Residence</span><div class="seg">${['LPD','Commuter'].map(h=>`<button type="button" data-house="${h}" aria-pressed="${c.housing===h}">${h}</button>`).join('')}</div></div>
         <div class="fld"><label for="d-admit">Admission date</label><input id="d-admit" type="date" data-f="admitDate" value="${c.admitDate}"></div>
         <div class="fld"><span class="lbl">Projected step-down</span>${isDC(c)?'<span class="of">n/a</span>':`<button type="button" class="plan-link boxed" data-plan="${c.id}">${nextPlan(c)?`${fmt(nextPlan(c).date)} → ${nextPlan(c).loc}${c.plans.length>1?` (+${c.plans.length-1})`:''}`:'+ Schedule a change'}</button>`}</div>
@@ -1155,6 +1163,9 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-sh]')){const k=e.target.dataset.sh,i=+e.target.dataset.i,v=e.target.value,h=state.sched.hours[k];
     if(!v){render();return}const n=[...h];n[i]=v;if(n[0]>=n[1]){toast('The end time needs to be after the start time.');render();return}
     snap();state.sched.hours[k]=n;save();render();toast(`${BLOCKS[k].n} hours set to ${blockLabel(n)}.`,true);return}
+  if(e.target.matches('[data-locon]')){const l=e.target.dataset.locon,a=state.sched.locs;
+    if(!e.target.checked&&a.length<=1){toast('Keep at least one level of care turned on.');render();return}
+    snap();state.sched.locs=e.target.checked?LEVELS.filter(x=>a.includes(x)||x===l):a.filter(x=>x!==l);save();render();return}
   if(e.target.matches('[data-eve]')){const d=e.target.dataset.eve;snap();const a=state.sched.eveDays;state.sched.eveDays=e.target.checked?[...a,d]:a.filter(x=>x!==d);save();render();return}
   if(e.target.matches('[data-dd]')){const l=e.target.dataset.dd,d=e.target.dataset.day;snap();const a=state.sched.days[l];state.sched.days[l]=e.target.checked?[...a,d]:a.filter(x=>x!==d);save();render();return}
   if(e.target.matches('[data-staff-edit]')){const k=e.target.dataset.staffEdit,i=+e.target.dataset.i,old=state.staff[k][i],n=e.target.value.trim();
@@ -1244,7 +1255,7 @@ function renderPlanner(){
     ${planDraft.map((p,i)=>`<fieldset class="slot" style="--c:${p.loc?cvar(p.loc):'var(--accent)'}"><legend>Change ${i+1}</legend>
       <div class="slot-g">
         <div class="fld"><label for="p${i}-date">On this date</label><input type="date" id="p${i}-date" data-p="${i}" data-pf="date" value="${p.date}"></div>
-        <div class="fld"><label for="p${i}-loc">Change LOC to</label><select id="p${i}-loc" data-p="${i}" data-pf="loc"><option value="">Choose…</option>${LEVELS.map(l=>`<option value="${l}" ${p.loc===l?'selected':''}>${l}</option>`).join('')}</select></div>
+        <div class="fld"><label for="p${i}-loc">Change LOC to</label><select id="p${i}-loc" data-p="${i}" data-pf="loc"><option value="">Choose…</option>${LEVELS.filter(l=>locOn(l)||p.loc===l).map(l=>`<option value="${l}" ${p.loc===l?'selected':''}>${l}</option>`).join('')}</select></div>
       </div>
       ${p.loc&&p.loc!=='Discharged'?pickerHTML(i,p):''}
       ${p.date||p.loc?`<div><button type="button" class="btn small" data-pclear="${i}">Clear this change</button></div>`:''}

@@ -39,3 +39,4 @@ Open `index.html` in a browser. There is nothing to install.
 Settings has a SUD / MH switch at the top; everything on the page applies only to the selected program.
 - **Staff**: clinician, case manager and psych APN lists are stored separately for each program.
 - **Treatment schedule** (`state.sched`): group hours for All day (PC), Daytime, Afternoon and Evening; which days evening groups run; default days for each LOC. Labels and rules on the Schedule page and client cards follow these. Changing them doesn't rewrite existing clients' days; defaults apply when a client moves to a LOC.
+- **Levels of care offered** (`state.sched.locs`): per-program on/off for each LOC. Only offered levels appear in LOC dropdowns, step-down plans, census filter chips and the default-days grid. Clients already in a turned-off level keep it until changed. At least one level stays on.
