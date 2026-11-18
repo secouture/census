@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Census Board</title>
+<title>Census - SUD</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -49,6 +49,13 @@ button{cursor:pointer}
 header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-block:18px 10px}
 .brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
 .brand h1{font-family:var(--f-display);font-weight:800;font-size:24px;letter-spacing:-.02em;margin:0}
+.brand{flex-wrap:wrap;align-items:center}
+.prog-sw{display:inline-flex;background:var(--sunk);border-radius:8px;padding:2px;gap:2px}
+.prog-sw button{border:0;background:none;border-radius:6px;padding:3px 10px;font-weight:700;font-size:12px;color:var(--muted);cursor:pointer;letter-spacing:.03em}
+.prog-sw button[aria-pressed="true"]{background:var(--prog);color:#fff}
+:root{--prog:#2c6b70}
+body.prog-mh{--prog:#6a4bb0}
+body.prog-mh .brand h1{color:var(--prog)}
 .brand .date{color:var(--muted);font-size:13px}
 .tabs{display:flex;gap:2px;background:var(--sunk);padding:3px;border-radius:9px}
 .tabs a{padding:6px 14px;border-radius:7px;text-decoration:none;color:var(--muted);font-weight:600;font-size:13px}
@@ -406,7 +413,7 @@ table.arch td{white-space:normal}
 <div class="wrap">
   <p class="notice"><b>Prototype with made-up sample clients.</b> Don't enter real client information here. Changes save only in this browser.</p>
   <header class="top">
-    <div class="brand"><h1>Census</h1><span class="date" id="today"></span></div>
+    <div class="brand"><h1 id="prog-title">Census - SUD</h1><div class="prog-sw" role="group" aria-label="Program"><button type="button" data-prog="sud">SUD</button><button type="button" data-prog="mh">MH</button></div><span class="date" id="today"></span></div>
     <div class="navgrp"><div id="attn-slot"></div>
     <nav class="tabs" aria-label="Views">
       <a href="#census" data-view="census">Census</a>
@@ -457,7 +464,21 @@ const M6=['mon','tue','wed','thu','fri','sat'],M5=['mon','tue','wed','thu','fri'
 const DEFAULT_DAYS={Pending:[],PC6:M6,PC5:M5,IOP6:M6,IOP5:M5,IOP4:['mon','tue','wed','thu'],IOP3:['mon','tue','thu'],EIOP:['mon','tue','thu'],OP:['tue'],Discharged:[]};
 const DEFAULT_LOS={PHP:21,IOP:28};
 const OP_TO_DC=42;
-const KEY='census-prototype-v7';
+/* Two programs, each with its own separate census data: SUD (substance use) and MH (mental health). */
+const PROGRAMS={sud:{name:'SUD',key:'census-prototype-v7'},mh:{name:'MH',key:'census-prototype-v7-mh'}};
+let PROG=(()=>{try{const p=localStorage.getItem('census-program');return PROGRAMS[p]?p:'sud'}catch(e){return 'sud'}})();
+let KEY=PROGRAMS[PROG].key;
+/* MH sample clients get their own made-up names so the two programs are clearly different */
+const MH_NAMES=['Harper Quill','Rowan Delacroix','Emerson Vale','Sasha Morrow','Tatum Reyes','Logan Pryce','Blair Okafor','Jamie Lindholm','Parker Ames','Skyler Tran','Avery Holt','Cameron Voss','Drew Kessler','Finley Ortiz','Hayden Brooks','Jordan Wilde','Kendall Shaw','Micah Ferro','Noel Bianchi','Quinn Harlow','Reagan Moss','Sage Whitaker','Taylor Ruiz-Kemp','Ellis Navarro','Marlow Price','Sutton Greer','Lennox Hale','Arden Fitch','Corey Lam'];
+function sampleFor(){const cs=sample();if(PROG!=='mh')return cs;cs.forEach((c,i)=>{c.name=MH_NAMES[i]||c.name});return cs}
+function sampleArchiveFor(){const a=sampleArchive();if(PROG!=='mh')return a;a.forEach((c,i)=>{c.name=MH_NAMES[24+i]||c.name});return a}
+function switchProgram(p){
+  if(!PROGRAMS[p]||p===PROG)return;
+  save();PROG=p;KEY=PROGRAMS[p].key;try{localStorage.setItem('census-program',p)}catch(e){}
+  state=load();undoSnap=null;openId=null;pop=null;F.q='';F.staff='';F.house='';F.loc='';
+  $('#f-search').value='';$('#f-house').value='';$('#layer').innerHTML='';$('#rowpop')?.remove();
+  runScheduled();render();toast(`Switched to Census - ${PROGRAMS[p].name}.`);
+}
 /* Sample discharge types until the program's real list is provided. */
 const DC_TYPES=['Completed treatment','Stepped down to outside provider','Transferred to higher level of care','Left against clinical advice','Administrative discharge','Lost contact / non-attendance','Insurance / financial'];
 const dcMissing=c=>c.dischargedOn&&(!c.dcType||!c.dcCompleted||!c.dcLonger);
@@ -586,7 +607,7 @@ const STAFF_ROLES=[['clinician','Clinicians','Clinician'],['caseManager','Case m
 function ensureStaff(s){s.staff=s.staff||{clinician:[...CLIN],caseManager:[...CM],psychApn:[...APN]};
   ['clinician','caseManager','psychApn'].forEach(k=>{s.staff[k]=s.staff[k]||[];s.clients.forEach(c=>{if(c[k]&&!s.staff[k].includes(c[k]))s.staff[k].push(c[k])})});return s}
 function migrate(s){s.clients.forEach(c=>{if(c.loc==='Discharged'){c.loc=LEVELS.includes(c.lastLoc)?c.lastLoc:'OP';c.dcDone=true}});s.archive.forEach(a=>{if(a.locAtRemoval==='Discharged')a.locAtRemoval=LEVELS.includes(a.lastLoc)?a.lastLoc:'OP';if(a.loc==='Discharged')a.loc=a.locAtRemoval});return s}
-function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients)){s.archive=s.archive||[];return ensureStaff(migrate(s))}}catch(e){}return ensureStaff({clients:sample(),archive:sampleArchive(),seq:100})}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients)){s.archive=s.archive||[];return ensureStaff(migrate(s))}}catch(e){}return ensureStaff({clients:sampleFor(),archive:sampleArchiveFor(),seq:100})}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 const byId=id=>state.clients.find(c=>c.id===id);
 let undoSnap=null;
@@ -879,7 +900,13 @@ function setView(html){
   fl.classList.toggle('in-week',view==='schedule');
   if(keep&&document.activeElement!==a){a.focus();try{if(ss!=null)a.setSelectionRange(ss,ss)}catch(e){}}
 }
+function renderProgram(){
+  $('#prog-title').textContent=`Census - ${PROGRAMS[PROG].name}`;document.title=`Census - ${PROGRAMS[PROG].name}`;
+  document.querySelectorAll('[data-prog]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.prog===PROG));
+  document.body.classList.toggle('prog-mh',PROG==='mh');
+}
 function render(){
+  renderProgram();
   $('#today').textContent=`${pISO(TODAY).toLocaleDateString('en-US',{weekday:'long'})} ${fmt(TODAY)}`;
   document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.view===view?'page':'false'));
   document.body.classList.toggle('v-settings',view==='settings');
@@ -1172,6 +1199,7 @@ document.addEventListener('click',e=>{
   const gt=t.closest('[data-goto-today]');if(gt){e.preventDefault();weekMode='3';weekShift=0;try{localStorage.setItem('census-weekmode','3')}catch(e){}
     if(location.hash!=='#schedule')location.hash='#schedule';else render();
     setTimeout(()=>{const d=document.querySelector('.day.today')||document.querySelector('.week .day');if(d)window.scrollTo({top:Math.max(0,d.getBoundingClientRect().top+scrollY-90),behavior:'smooth'})},60);return}
+  const pg=t.closest('[data-prog]');if(pg){switchProgram(pg.dataset.prog);return}
   const rbl=t.closest('[data-rowbell]');
   if(rbl){const open=$('#rowpop');if(open&&open.dataset.id===rbl.dataset.rowbell){open.remove();return}showRowPop(rbl);return}
   if($('#rowpop')&&!t.closest('#rowpop'))$('#rowpop').remove();
@@ -1231,7 +1259,7 @@ $('#btn-add').addEventListener('click',()=>{
 let resetArmed=false;
 $('#btn-reset').addEventListener('click',e=>{
   if(!resetArmed){resetArmed=true;e.target.textContent='Click again to reset';setTimeout(()=>{resetArmed=false;e.target.textContent='Reset sample data'},3000);return}
-  resetArmed=false;e.target.textContent='Reset sample data';snap();state=ensureStaff({clients:sample(),archive:sampleArchive(),seq:100});save();closeLayer();render();toast('Sample data restored.',true);
+  resetArmed=false;e.target.textContent='Reset sample data';snap();state=ensureStaff({clients:sampleFor(),archive:sampleArchiveFor(),seq:100});save();closeLayer();render();toast('Sample data restored.',true);
 });
 
 /* ---------- toast ---------- */
