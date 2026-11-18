@@ -61,6 +61,20 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .stat .v{font-family:var(--f-display);font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
 .stat .s{font-size:12px;color:var(--muted)}
 .stat.alert .v{color:var(--crit)}
+.stats{position:relative}
+button.stat{font:inherit;color:inherit;text-align:left;cursor:pointer}
+button.stat:hover{border-color:var(--muted)}
+button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 15%,transparent)}
+.attn-pop{position:absolute;top:calc(100% + 6px);right:0;z-index:40;width:min(440px,100%);max-height:min(60vh,480px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px}
+.attn-pop h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:6px 8px 6px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.attn-pop h2 button{border:0;background:none;color:var(--muted);font-size:18px;line-height:1;padding:0 4px;cursor:pointer}
+.attn-pop ul{list-style:none;margin:0;padding:0}
+.attn-pop li button{width:100%;border:0;background:none;text-align:left;padding:7px 8px;border-radius:8px;display:flex;flex-direction:column;gap:1px;cursor:pointer;font:inherit;color:inherit}
+.attn-pop li button:hover{background:var(--sunk)}
+.attn-pop li+li{border-top:1px solid var(--line)}
+.attn-pop .an{font-weight:600;font-size:13.5px}
+.attn-pop .an span{color:var(--muted);font-weight:500;font-size:12px}
+.attn-pop .empty{color:var(--muted);font-size:13px;padding:6px 8px}
 .swatch{width:8px;height:8px;border-radius:2px;display:inline-block}
 
 .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
@@ -574,6 +588,7 @@ function runScheduled(){
 const $=s=>document.querySelector(s);
 let view='census', sort={k:'loc',dir:1}, openId=null;
 
+let attnOpen=false;
 function renderStats(){
   const act=state.clients.filter(c=>LEVELS.includes(c.loc));
   const n=l=>state.clients.filter(c=>group(c.loc)===l).length;
@@ -587,7 +602,8 @@ function renderStats(){
     st('Pending',n('Pending'),'incoming admits','',cvar('Pending'))+
     st('LPD',lpd,`${act.length-lpd} commuters`)+
     st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
-    st('Need attention',attn,'see list below',attn?'alert':'');
+    `<button type="button" class="stat ${attn?'alert':''}" data-attn aria-expanded="${attnOpen}" aria-controls="attn-pop"><div class="k">Needs attention</div><div class="v">${attn}</div><div class="s">${attnOpen?'click to close':'click to see list'}</div></button>`+
+    (attnOpen?renderAttention(state.clients):'');
 }
 function renderStaffFilter(){
   const sel=$('#f-staff'), cur=F.staff;
@@ -600,10 +616,9 @@ function renderStaffFilter(){
 }
 function daysDots(c){return `<span class="days" style="--c:${cvar(c.loc)}">${DAYS.map(d=>`<i class="${c.days.includes(d)?'on':''}">${DAY_SHORT[d]}</i>`).join('')}</span>`}
 function renderAttention(list){
-  const items=[];
-  list.filter(recentDc).forEach(c=>flags(c).filter(f=>f.lvl!=='info').forEach(f=>items.push({c,f})));
-  items.sort((a,b)=>sev[a.f.lvl]-sev[b.f.lvl]||a.c.name.localeCompare(b.c.name));
-  return `<section class="attn"><h2>Needs attention</h2>${items.length?`<ul>${items.map(({c,f})=>`<li><button data-open="${c.id}"><span class="flag ${f.lvl}" style="padding:0;background:none">${esc(f.text)}</span>${esc(c.name)} · ${c.loc}</button></li>`).join('')}</ul>`:'<p class="empty">Nothing due in the next few days.</p>'}</section>`;
+  const items=list.filter(recentDc).map(c=>({c,fs:flags(c).filter(f=>f.lvl!=='info').sort((a,b)=>sev[a.lvl]-sev[b.lvl])})).filter(x=>x.fs.length);
+  items.sort((a,b)=>sev[a.fs[0].lvl]-sev[b.fs[0].lvl]||a.c.name.localeCompare(b.c.name));
+  return `<div class="attn-pop" id="attn-pop" role="dialog" aria-label="Needs attention"><h2>Needs attention<button type="button" data-attn aria-label="Close">×</button></h2>${items.length?`<ul>${items.map(({c,fs})=>`<li><button data-open="${c.id}"><span class="an">${esc(c.name)} <span>· ${c.loc}</span></span>${fs.map(f=>`<span class="flag ${f.lvl}" style="padding:0;background:none">${esc(f.text)}</span>`).join('')}</button></li>`).join('')}</ul>`:'<p class="empty">Nothing due in the next few days.</p>'}</div>`;
 }
 /* Week view range: full week = Mon–Sat; 3-day = the next 3 program days from today (Sundays skipped). Arrows shift the range. */
 let weekMode=(()=>{try{return localStorage.getItem('census-weekmode')||'full'}catch(e){return 'full'}})(), weekShift=0;
@@ -674,7 +689,7 @@ function renderCensus(){
   const rows=sortedRows();
   const n=l=>state.clients.filter(c=>group(c.loc)===l&&visible(c)&&recentDc(c)).length;
   const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['','Pending',...GROUPS,'Discharged'].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l?cvar(l):'var(--accent)'}">${l||'All'} <span>${l?n(l):state.clients.filter(c=>visible(c)&&recentDc(c)).length}</span></button>`).join('')}</div>`;
-  return renderAttention(state.clients.filter(visible))+`<div class="tbar">${chips}<p>Change LOC right in the row. Click a name for full details.</p>
+  return `<div class="tbar">${chips}<p>Change LOC right in the row. Click a name for full details.</p>
     <button class="btn small" id="btn-copy">Copy as spreadsheet (CSV)</button></div>
   <div class="tablewrap scroll"><table class="census"><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
   <tbody>${rows.map(c=>`<tr style="--c:${cvar(c.loc)}" class="${c.loc==='Discharged'?'dc':''}">${COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="${COLS.length}" class="of">No clients match these filters.</td></tr>`}</tbody></table></div>`;
@@ -954,6 +969,9 @@ document.addEventListener('click',e=>{
   if(suppressClick){suppressClick=false;e.preventDefault();return}
   const t=e.target;
   if(t.closest('select'))return;
+  if(t.closest('[data-attn]')){attnOpen=!attnOpen;renderStats();return}
+  if(attnOpen&&!t.closest('#attn-pop')){attnOpen=false;renderStats()}
+  if(attnOpen&&t.closest('#attn-pop [data-open]')){attnOpen=false;renderStats()}
   const c=byId(openId);
   const lf=t.closest('[data-locf]');if(lf){F.loc=lf.dataset.locf;render();return}
   if(t.closest('[data-close]')){closeLayerOrPlanner();return}
@@ -991,6 +1009,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&$('#confirm-slot').innerHTML){closeConfirm();return}
+  if(e.key==='Escape'&&attnOpen){attnOpen=false;renderStats();return}
   if(e.key==='Escape'&&$('#layer').innerHTML)closeLayerOrPlanner();
   if((e.key==='Enter'||e.key===' ')&&e.target.matches('.card')){e.preventDefault();openClient(e.target.dataset.id)}
 });
