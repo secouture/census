@@ -408,8 +408,15 @@ function sample(){
 }
 
 /* Fictional archived records: discharges and incomplete (failed) admissions. */
+function archHist(kind,admit,dc,type,arch,loc){
+  const h=[{date:addDays(TODAY,admit-3),text:'Referral received'}];
+  if(kind==='incomplete'){h.push({date:addDays(TODAY,admit-1),text:'Admit date scheduled'},{date:addDays(TODAY,admit+2),text:'Did not attend first day'});}
+  else{h.push({date:addDays(TODAY,admit),text:'Pending → PC5'},{date:addDays(TODAY,admit+21),text:'Auto-updated per schedule: PC5 → IOP3 · M Tu Th · 9–12'},{date:addDays(TODAY,dc),text:'Date of discharge set'},{date:addDays(TODAY,dc),text:`Discharge type: ${type}`});}
+  h.push({date:addDays(TODAY,arch),text:`Archived under ${kind==='incomplete'?'Incomplete admissions':'Discharges'}`});
+  return h;
+}
 function sampleArchive(){
-  const A=(id,name,kind,admit,dc,type,los,note,comp,longer,arch,loc)=>({id,name,kind,admitDate:addDays(TODAY,admit),dischargedOn:dc==null?'':addDays(TODAY,dc),dcType:type,commitDays:los,commitNote:note,dcCompleted:comp,dcLonger:longer,archivedOn:addDays(TODAY,arch),locAtRemoval:loc,clinician:CLIN[(id.charCodeAt(1)||0)%4],history:[]});
+  const A=(id,name,kind,admit,dc,type,los,note,comp,longer,arch,loc)=>({id,name,kind,admitDate:addDays(TODAY,admit),dischargedOn:dc==null?'':addDays(TODAY,dc),dcType:type,commitDays:los,commitNote:note,dcCompleted:comp,dcLonger:longer,archivedOn:addDays(TODAY,arch),locAtRemoval:loc,clinician:CLIN[(id.charCodeAt(1)||0)%4],history:archHist(kind,admit,dc,type,arch,loc)});
   return [
     A('a1','Morgan Ellery','discharge',-120,-41,'Completed treatment',70,'PC 3 wks, IOP 4 wks, OP 3 wks','Yes','Yes',-35,'Discharged'),
     A('a2','Dana Whitlock','discharge',-95,-52,'Left against clinical advice',56,'PC 3 wks, IOP 5 wks','No','No',-45,'Discharged'),
@@ -640,7 +647,7 @@ function archRows(){
 const commitText=r=>[r.commitDays?`${r.commitDays} days`:'',r.commitNote||''].filter(Boolean).join(' · ');
 function renderArchive(){
   const n=k=>state.archive.filter(r=>r.kind===k).length, rows=archRows();
-  const cell=(r,k)=>k==='commit'?esc(commitText(r))||'—':['admitDate','dischargedOn','archivedOn'].includes(k)?`<span class="mono">${fmt(r[k])}</span>`:esc(r[k])||'—';
+  const cell=(r,k)=>k==='name'?`<button class="linkish" data-arch-open="${r.id}">${esc(r.name)}</button>`:k==='commit'?esc(commitText(r))||'—':['admitDate','dischargedOn','archivedOn'].includes(k)?`<span class="mono">${fmt(r[k])}</span>`:esc(r[k])||'—';
   return `<div class="tbar"><div class="locfilter" role="group" aria-label="Archive list">
       <button data-arch-kind="discharge" aria-pressed="${archKind==='discharge'}" style="--c:var(--dc)">Discharges <span>${n('discharge')}</span></button>
       <button data-arch-kind="incomplete" aria-pressed="${archKind==='incomplete'}" style="--c:var(--pend)">Incomplete admissions <span>${n('incomplete')}</span></button></div>
@@ -657,6 +664,30 @@ function archCsv(){
 function copyText(text,btn,label){
   const done=()=>{btn.textContent='Copied. Paste into Excel';setTimeout(()=>btn.textContent=label,2500)};
   try{navigator.clipboard.writeText(text).then(done,()=>fallbackCopy(text))}catch(_){fallbackCopy(text)}
+}
+
+function openArchived(id){
+  const r=state.archive.find(x=>x.id===id);if(!r)return;
+  openId=null;
+  const row=(k,v)=>`<div class="fld"><span class="lbl">${k}</span><span>${v||'—'}</span></div>`;
+  const stay=r.admitDate&&r.dischargedOn?Math.max(1,diff(r.admitDate,r.dischargedOn)+1):0;
+  $('#layer').innerHTML=`<div class="scrim" data-close></div>
+  <aside class="drawer" style="--c:var(${r.kind==='incomplete'?'--pend':'--dc'})" role="dialog" aria-label="${esc(r.name)} archived record">
+    <div class="drawer-h"><h2>${esc(r.name)}</h2><button class="x" data-close aria-label="Close">×</button></div>
+    <div class="drawer-b">
+      <div class="summary"><span class="flag info">Archived ${fmt(r.archivedOn)} · ${r.kind==='incomplete'?'Incomplete admission':'Discharge'}</span>${stay?`<span class="flag info">${stay} days${r.commitDays?` of ${r.commitDays}`:''}</span>`:''}</div>
+      <div class="grid2">
+        ${row('Admission date',fmt(r.admitDate))}${row('Discharge date',r.dischargedOn?fmt(r.dischargedOn):'')}
+        ${row('Discharge type',esc(r.dcType))}${row('LOC when removed',esc(r.locAtRemoval))}
+        ${row('Incoming commitment',esc(commitText(r)))}${row('Clinician',esc(r.clinician))}
+        ${row('Completed commitment?',esc(r.dcCompleted))}${row('Longer than commitment?',esc(r.dcLonger))}
+      </div>
+      <div class="sec-h">History</div>
+      <ul class="hist">${[...(r.history||[])].reverse().map(h=>`<li><span class="mono">${fmt(h.date)}</span><span>${esc(h.text)}</span></li>`).join('')||'<li class="of">No history recorded.</li>'}</ul>
+      <div class="confirm"><button class="btn small" data-restore="${r.id}">Restore to census</button></div>
+    </div>
+  </aside>`;
+  setTimeout(()=>$('.drawer .x')?.focus(),0);
 }
 
 /* ---------- drawer ---------- */
@@ -863,14 +894,16 @@ document.addEventListener('click',e=>{
   if(t.closest('[data-del]')){confirmDel=true;renderDrawer();return}
   if(t.closest('[data-del-no]')){confirmDel=false;renderDrawer();return}
   if(t.closest('[data-del-yes]')&&c){const kind=archiveKind(c);if(!kind)return;snap();
+    c.history.push({date:TODAY,text:`Archived under ${kind==='incomplete'?'Incomplete admissions':'Discharges'}`});
     state.archive.unshift({...JSON.parse(JSON.stringify(c)),kind,archivedOn:TODAY,locAtRemoval:c.loc});
     state.clients=state.clients.filter(x=>x.id!==c.id);save();closeLayer();render();
     toast(`${c.name} archived under ${kind==='incomplete'?'Incomplete admissions':'Discharges'}.`,true);return}
+  const ao=t.closest('[data-arch-open]');if(ao){openArchived(ao.dataset.archOpen);return}
   const ab=t.closest('[data-arch-kind]');if(ab){archKind=ab.dataset.archKind;render();return}
   const rs=t.closest('[data-restore]');if(rs){const r=state.archive.find(x=>x.id===rs.dataset.restore);if(!r)return;snap();
     const {kind,archivedOn,locAtRemoval,...cl}=r;cl.loc=locAtRemoval||(cl.dischargedOn?'Discharged':'Pending');cl.days=cl.days||[];cl.blocks=cl.blocks||{};cl.plans=cl.plans||[];cl.history=[...(cl.history||[]),{date:TODAY,text:'Restored from archive'}];
     cl.caseManager=cl.caseManager||CM[0];cl.psychApn=cl.psychApn||APN[0];cl.referral=cl.referral||'';cl.housing=cl.housing||'Commuter';cl.dcDate=cl.dcDate||'';
-    state.archive=state.archive.filter(x=>x.id!==r.id);state.clients.push(cl);save();render();toast(`${r.name} restored to the census.`,true);return}
+    state.archive=state.archive.filter(x=>x.id!==r.id);state.clients.push(cl);save();closeLayer();render();toast(`${r.name} restored to the census.`,true);return}
   if(t.id==='btn-copy-arch'){copyText(archCsv(),t,'Copy this list (CSV)');return}
   if(t.closest('[data-undo]')){if(undoSnap){state=JSON.parse(undoSnap);undoSnap=null;save();render();toast('Undone.')}return}
   if(t.id==='btn-copy'){copyCsv(t);return}
