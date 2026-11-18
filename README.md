@@ -34,3 +34,8 @@ Open `index.html` in a browser. There is nothing to install.
 - Kipu EMR integration
 - Sign-in, roles, and a shared database so the whole team sees the same census
 - Reports (census trends, length of stay by level of care, referral source outcomes)
+
+## Per-program settings (SUD vs MH)
+Settings has a SUD / MH switch at the top; everything on the page applies only to the selected program.
+- **Staff**: clinician, case manager and psych APN lists are stored separately for each program.
+- **Treatment schedule** (`state.sched`): group hours for All day (PC), Daytime, Afternoon and Evening; which days evening groups run; default days for each LOC. Labels and rules on the Schedule page and client cards follow these. Changing them doesn't rewrite existing clients' days; defaults apply when a client moves to a LOC.

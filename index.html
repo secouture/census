@@ -407,6 +407,23 @@ table.arch td:first-child{white-space:nowrap}
 #rowpop .rp-open{border:0;background:none;color:var(--accent);font-weight:600;font-size:12.5px;padding:2px 0 0;text-align:left;cursor:pointer}
 
 /* Settings */
+.set-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
+.set-top .set-h{margin:0}
+.set-prog{display:inline-flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px}
+.set-prog button{display:flex;align-items:center;gap:8px;border:0;background:none;border-radius:9px;padding:4px 10px 4px 4px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
+.set-prog button[aria-pressed="true"]{background:var(--sunk);color:var(--ink)}
+.set-prog .pm-dot{width:26px;height:26px;font-size:9.5px}
+.set-note{margin:0;color:var(--muted);font-size:13px}
+.sched-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.sched-grid h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.set-tbl{width:auto;font-size:13px}
+.set-tbl th,.set-tbl td{padding:4px 8px;border-bottom:1px solid var(--line);position:static;background:none;cursor:default;text-transform:none;letter-spacing:0;font-size:13px;color:var(--ink)}
+.set-tbl tr.hd td{font-size:11px;font-weight:600;color:var(--muted);text-align:center}
+.set-tbl.days th{text-align:left;white-space:nowrap}
+.set-tbl.days td{text-align:center}
+.set-tbl input[type=time]{border:1px solid var(--line);border-radius:6px;padding:3px 6px;background:var(--surface)}
+.daypick{display:flex;flex-wrap:wrap;gap:6px}
+.daypick label{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:8px;padding:4px 9px;background:var(--surface);font-size:13px;cursor:pointer}
 .settings{display:flex;flex-direction:column;gap:14px;max-width:980px}
 .set-h{font-family:var(--f-display);font-size:20px;margin:6px 0 0}
 .set-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
@@ -535,6 +552,19 @@ const BLOCK_ORDER=['ALL','AM','PM','EVE'];
 const allowedBlocks=loc=>/^PC/.test(loc)?['ALL']:['AM','PM','EVE'];
 /* The evening program (6–9pm) only runs Mon, Tue and Thu nights. */
 const EVE_DAYS=['mon','tue','thu'];
+/* Per-program schedule settings (Settings page). Stored in each program's own data as state.sched. */
+const SCHED_DEFAULT=()=>({hours:{ALL:['09:00','15:30'],AM:['09:00','12:00'],PM:['12:30','15:30'],EVE:['18:00','21:00']},eveDays:['mon','tue','thu'],
+  days:{PC6:[...M6],PC5:[...M5],IOP6:[...M6],IOP5:[...M5],IOP4:['mon','tue','wed','thu'],IOP3:['mon','tue','thu'],EIOP:['mon','tue','thu'],OP:['tue']}});
+const tShort=v=>{const [h,m]=v.split(':').map(Number);return m?`${h%12||12}:${String(m).padStart(2,'0')}`:`${h%12||12}`};
+const blockLabel=([a,b])=>`${tShort(a)}–${tShort(b)}${+b.split(':')[0]>=17?'pm':''}`;
+const words=a=>a.length<2?a.join(''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
+const eveWords=()=>EVE_DAYS.length?words(EVE_DAYS.map(d=>DAY_LABEL[d])):'no days';
+function applySched(){
+  if(!state.sched)state.sched=SCHED_DEFAULT();const c=state.sched;
+  BLOCK_ORDER.forEach(k=>{if(c.hours[k])BLOCKS[k].t=blockLabel(c.hours[k])});
+  EVE_DAYS.splice(0,EVE_DAYS.length,...DAYS.filter(d=>c.eveDays.includes(d)));
+  Object.keys(c.days).forEach(l=>{DEFAULT_DAYS[l]=DAYS.filter(d=>c.days[l].includes(d))});
+}
 const blocksFor=(loc,d)=>allowedBlocks(loc).filter(b=>b!=='EVE'||EVE_DAYS.includes(d));
 const defaultBlock=(loc,d)=>{const b=/^PC/.test(loc)?'ALL':loc==='EIOP'?'EVE':'AM';return d&&b==='EVE'&&!EVE_DAYS.includes(d)?'AM':b};
 const EXPECT={PC6:6,PC5:5,IOP6:6,IOP5:5,IOP4:4,IOP3:3,EIOP:3};
@@ -642,8 +672,9 @@ function sampleArchive(){
 
 /* ---------- state ---------- */
 let state=load();
+applySched();
 const STAFF_ROLES=[['clinician','Clinicians','Clinician'],['caseManager','Case managers','Case manager'],['psychApn','Psych APNs','Psych APN']];
-function ensureStaff(s){s.staff=s.staff||{clinician:[...CLIN],caseManager:[...CM],psychApn:[...APN]};
+function ensureStaff(s){s.sched=s.sched||SCHED_DEFAULT();s.staff=s.staff||{clinician:[...CLIN],caseManager:[...CM],psychApn:[...APN]};
   ['clinician','caseManager','psychApn'].forEach(k=>{s.staff[k]=s.staff[k]||[];s.clients.forEach(c=>{if(c[k]&&!s.staff[k].includes(c[k]))s.staff[k].push(c[k])})});return s}
 function migrate(s){s.clients.forEach(c=>{if(c.loc==='Discharged'){c.loc=LEVELS.includes(c.lastLoc)?c.lastLoc:'OP';c.dcDone=true}});s.archive.forEach(a=>{if(a.locAtRemoval==='Discharged')a.locAtRemoval=LEVELS.includes(a.lastLoc)?a.lastLoc:'OP';if(a.loc==='Discharged')a.loc=a.locAtRemoval});return s}
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients)){s.archive=s.archive||[];return ensureStaff(migrate(s))}}catch(e){}return ensureStaff({clients:sampleFor(),archive:sampleArchiveFor(),seq:100})}
@@ -726,7 +757,7 @@ function moveSlot(id,fromDay,toDay,toBlock){
   const c=byId(id);if(!c)return;
   const al=allowedBlocks(c.loc), fromB=blk(c,fromDay);
   if(!al.includes(toBlock)){toast(`${c.loc} meets ${al.map(b=>`${BLOCKS[b].n.toLowerCase()} (${BLOCKS[b].t})`).join(', ')} only.`);return}
-  if(toBlock==='EVE'&&!EVE_DAYS.includes(toDay)){toast('Evening groups only run Mon, Tue and Thu nights.');return}
+  if(toBlock==='EVE'&&!EVE_DAYS.includes(toDay)){toast(`Evening groups only run ${eveWords()} nights.`);return}
   if(fromDay===toDay&&fromB===toBlock)return;
   if(fromDay!==toDay&&c.days.includes(toDay)){toast(`${c.name} is already scheduled on ${DAY_LABEL[toDay]}.`);return}
   snap();
@@ -834,12 +865,22 @@ addEventListener('scroll',()=>$('#rowpop')?.remove(),true);
 function renderSettings(){
   const all=[...state.clients];
   const cnt=(k,n)=>all.filter(c=>c[k]===n&&!isDC(c)).length;
+  const sc=state.sched, pn=PROGRAMS[PROG].name;
+  const BL={ALL:'All day (PC)',AM:'Daytime',PM:'Afternoon',EVE:'Evening'};
   return `<div class="settings">
-  <h2 class="set-h">Settings</h2>
-  <section class="set-card"><h3>Staff</h3><p class="help">These lists fill the Clinician, Case manager and Psych APN dropdowns on each client's card. Renaming someone updates every client assigned to them. Removing someone takes them off the dropdown only; clients already assigned keep the name until you reassign them.</p>
+  <div class="set-top"><h2 class="set-h">Settings</h2><div class="set-prog" role="group" aria-label="Program settings">${Object.entries(PROGRAMS).map(([k,v])=>`<button type="button" data-set-prog="${k}" aria-pressed="${k===PROG}"><span class="pm-dot ${k}">${v.name}</span>Census - ${v.name}</button>`).join('')}</div></div>
+  <p class="set-note">You're editing settings for <b>Census - ${pn}</b>. Each program keeps its own staff and schedule settings.</p>
+  <section class="set-card"><h3>Staff · ${pn}</h3><p class="help">These lists fill the Clinician, Case manager and Psych APN dropdowns on each client's card. Renaming someone updates every client assigned to them. Removing someone takes them off the dropdown only; clients already assigned keep the name until you reassign them.</p>
   <div class="staff-grid">${STAFF_ROLES.map(([k,plural,one])=>`<div class="staff-col"><h4>${plural} <span>${state.staff[k].length}</span></h4>
     <ul>${state.staff[k].map((n,i)=>`<li><input value="${esc(n)}" data-staff-edit="${k}" data-i="${i}" aria-label="${one} name"><span class="cl" title="Active clients assigned">${cnt(k,n)}</span><button type="button" class="x" data-staff-del="${k}" data-i="${i}" aria-label="Remove ${esc(n)}">×</button></li>`).join('')||'<li class="empty">No one yet</li>'}</ul>
     <form class="staff-add" data-staff-add="${k}"><input placeholder="Add ${one.replace('Case','case').replace('Clinician','clinician')}" aria-label="New ${one} name"><button class="btn small" type="submit">Add</button></form></div>`).join('')}</div></section>
+  <section class="set-card"><h3>Treatment schedule · ${pn}</h3><p class="help">Group hours and days for this program. Changes apply to schedules you set from now on and to the Schedule page labels; clients' existing days aren't changed.</p>
+  <div class="sched-grid">
+   <div><h4>Group hours</h4><table class="set-tbl"><tbody>${BLOCK_ORDER.map(k=>`<tr><th>${BL[k]}</th><td><input type="time" step="900" value="${sc.hours[k][0]}" data-sh="${k}" data-i="0" aria-label="${BL[k]} start"> – <input type="time" step="900" value="${sc.hours[k][1]}" data-sh="${k}" data-i="1" aria-label="${BL[k]} end"></td><td class="of">${BLOCKS[k].t}</td></tr>`).join('')}</tbody></table>
+    <h4 style="margin-top:14px">Evening groups run on</h4><div class="daypick">${DAYS.map(d=>`<label><input type="checkbox" data-eve="${d}" ${sc.eveDays.includes(d)?'checked':''}>${DAY_SHORT[d]}</label>`).join('')}</div></div>
+   <div><h4>Default days by LOC</h4><table class="set-tbl days"><tbody><tr class="hd"><td></td>${DAYS.map(d=>`<td>${DAY_SHORT[d]}</td>`).join('')}</tr>${LEVELS.map(l=>`<tr><th style="color:${cvar(l)}">${l}${CUSTOM_DAYS.includes(l)?' <span class="of">varies</span>':''}</th>${DAYS.map(d=>`<td><input type="checkbox" data-dd="${l}" data-day="${d}" ${sc.days[l].includes(d)?'checked':''} aria-label="${l} ${DAY_LABEL[d]}"></td>`).join('')}</tr>`).join('')}</tbody></table>
+    <p class="help" style="margin-top:6px">Used when a client moves to that LOC. You can still change any client's days on their card.</p></div>
+  </div></section>
   <section class="set-card"><h3>Import spreadsheet</h3><p class="help">Bring in clients from an Excel (.xlsx) or CSV file, or paste rows copied from Excel. Columns are matched by their headings and you see a preview before anything is added. New staff names in the file are added to the staff lists.</p>
   <button class="btn primary" id="btn-import">Import spreadsheet</button></section>
   </div>`;
@@ -871,7 +912,7 @@ function weekControls(){
 }
 function renderSchedule(){
   const list=state.clients.filter(c=>isActive(c)&&visible(c));
-  const legend=`<div class="legend wk-hint"><span>Drag a name to another day or time block to change that client's schedule. PC is all day only, and evening groups run Mon, Tue and Thu only. Click a name for details.</span></div>`;
+  const legend=`<div class="legend wk-hint"><span>Drag a name to another day or time block to change that client's schedule. PC is all day only, and evening groups run ${eveWords()} only. Click a name for details.</span></div>`;
   const cols=weekDates().map(({k,date})=>{
     const cs=list.filter(c=>c.days.includes(k)).sort((a,b)=>RANK[a.loc]-RANK[b.loc]||a.name.localeCompare(b.name));
     const by=g=>cs.filter(c=>group(c.loc)===g).length, lpd=cs.filter(c=>c.housing==='LPD').length;
@@ -947,7 +988,7 @@ function renderProgram(){
   document.body.classList.toggle('prog-mh',PROG==='mh');
 }
 function render(){
-  renderProgram();
+  applySched();renderProgram();
   $('#today').textContent=`${pISO(TODAY).toLocaleDateString('en-US',{weekday:'long'})} ${fmt(TODAY)}`;
   document.querySelectorAll('.tabs a,.util .gear').forEach(a=>a.setAttribute('aria-current',a.dataset.view===view?'page':'false'));
   document.body.classList.toggle('v-settings',view==='settings');
@@ -1118,6 +1159,11 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-row-loc]')){moveLoc(e.target.dataset.rowLoc,e.target.value);return}
   if(e.target.matches('[data-row-house]')){const r=byId(e.target.dataset.rowHouse);snap();r.housing=e.target.value;r.history.push({date:TODAY,text:`Residence changed to ${r.housing}`});save();render();toast(`${r.name} now marked ${r.housing}.`,true);return}
   if(e.target.matches('[data-loc-select]')&&c){moveLoc(c.id,e.target.value);return}
+  if(e.target.matches('[data-sh]')){const k=e.target.dataset.sh,i=+e.target.dataset.i,v=e.target.value,h=state.sched.hours[k];
+    if(!v){render();return}const n=[...h];n[i]=v;if(n[0]>=n[1]){toast('The end time needs to be after the start time.');render();return}
+    snap();state.sched.hours[k]=n;save();render();toast(`${BLOCKS[k].n} hours set to ${blockLabel(n)}.`,true);return}
+  if(e.target.matches('[data-eve]')){const d=e.target.dataset.eve;snap();const a=state.sched.eveDays;state.sched.eveDays=e.target.checked?[...a,d]:a.filter(x=>x!==d);save();render();return}
+  if(e.target.matches('[data-dd]')){const l=e.target.dataset.dd,d=e.target.dataset.day;snap();const a=state.sched.days[l];state.sched.days[l]=e.target.checked?[...a,d]:a.filter(x=>x!==d);save();render();return}
   if(e.target.matches('[data-staff-edit]')){const k=e.target.dataset.staffEdit,i=+e.target.dataset.i,old=state.staff[k][i],n=e.target.value.trim();
     if(!n||n===old){e.target.value=old;return}
     if(state.staff[k].includes(n)){toast(`${n} is already on the list.`);e.target.value=old;return}
@@ -1143,7 +1189,7 @@ $('#f-house').addEventListener('change',e=>{F.house=e.target.value;render()});
 /* ---------- day/time picker ---------- */
 function pickerHTML(ctx,x){
   const al=allowedBlocks(x.loc), exp=EXPECT[x.loc], n=x.days.length;
-  const note=/^PC/.test(x.loc)?'PC meets all day, 9–3:30.':x.loc==='EIOP'?'EIOP meets Mon, Tue and Thu evenings, 6–9pm. Daytime and afternoon IOP groups are available too.':CUSTOM_DAYS.includes(x.loc)?`${x.loc} days vary. Pick the days and a time block for each. Evening groups run Mon, Tue and Thu only.`:'Pick a time block for each day. Evening groups run Mon, Tue and Thu only.';
+  const note=/^PC/.test(x.loc)?`PC meets all day, ${BLOCKS.ALL.t}.`:x.loc==='EIOP'?`EIOP meets ${eveWords()} evenings, ${BLOCKS.EVE.t}. Daytime and afternoon IOP groups are available too.`:CUSTOM_DAYS.includes(x.loc)?`${x.loc} days vary. Pick the days and a time block for each. Evening groups run ${eveWords()} only.`:`Pick a time block for each day. Evening groups run ${eveWords()} only.`;
   return `<div class="fld"><span class="lbl">Days and times · ${n}x/wk${exp&&n!==exp?` <span class="warnt">${x.loc} is ${exp} days</span>`:''}</span>
     <p class="hint">${note}</p>
     <div class="bgrid" style="--c:${cvar(x.loc)}">${DAYS.map(d=>{const on=x.days.includes(d),b=on?((x.blocks||{})[d]||defaultBlock(x.loc,d)):'OFF';
@@ -1243,6 +1289,7 @@ document.addEventListener('click',e=>{
     setTimeout(()=>{const d=document.querySelector('.day.today')||document.querySelector('.week .day');if(d)window.scrollTo({top:Math.max(0,d.getBoundingClientRect().top+scrollY-90),behavior:'smooth'})},60);return}
   const pm=$('#prog-menu');
   if(t.closest('[data-add-client]')){addClient();return}
+  const sp=t.closest('[data-set-prog]');if(sp){switchProgram(sp.dataset.setProg);return}
   if(t.closest('[data-prog-toggle]')){pm.hidden=!pm.hidden;$('#prog-btn').setAttribute('aria-expanded',!pm.hidden);return}
   const pg=t.closest('#prog-menu [data-prog]');if(pg){pm.hidden=true;$('#prog-btn').setAttribute('aria-expanded','false');switchProgram(pg.dataset.prog);return}
   if(!pm.hidden&&!t.closest('#prog-menu')){pm.hidden=true;$('#prog-btn').setAttribute('aria-expanded','false')}
