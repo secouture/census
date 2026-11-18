@@ -45,11 +45,11 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
 .brand h1{font-family:var(--f-display);font-weight:800;font-size:24px;letter-spacing:-.02em;margin:0}
 .brand{flex-wrap:wrap;align-items:center}
-.prog-sw{display:inline-flex;background:var(--sunk);border-radius:8px;padding:2px;gap:2px}
-.prog-sw button{border:0;background:none;border-radius:6px;padding:3px 10px;font-weight:700;font-size:12px;color:var(--muted);cursor:pointer;letter-spacing:.03em}
-.prog-sw button[aria-pressed="true"]{background:var(--prog);color:#fff}
-:root{--prog:#2c6b70}
-body.prog-mh{--prog:#6a4bb0}
+.prog-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:9px;padding:6px 10px;font-weight:700;font-size:12.5px;cursor:pointer;letter-spacing:.03em}
+.prog-btn svg{color:var(--prog-to)}
+.prog-btn:hover{border-color:var(--prog-to)}
+:root{--prog:#2c6b70;--prog-to:#6a4bb0}
+body.prog-mh{--prog:#6a4bb0;--prog-to:#2c6b70}
 body.prog-mh .brand h1{color:var(--prog)}
 .brand .date{color:var(--muted);font-size:13px}
 .tabs{display:flex;gap:2px;background:var(--sunk);padding:3px;border-radius:9px}
@@ -406,7 +406,7 @@ table.arch td{white-space:normal}
 <div class="wrap">
   <p class="notice"><b>Prototype with made-up sample clients.</b> Don't enter real client information here. Changes save only in this browser.</p>
   <header class="top">
-    <div class="brand"><h1 id="prog-title">Census - SUD</h1><div class="prog-sw" role="group" aria-label="Program"><button type="button" data-prog="sud">SUD</button><button type="button" data-prog="mh">MH</button></div><span class="date" id="today"></span></div>
+    <div class="brand"><h1 id="prog-title">Census - SUD</h1><span class="date" id="today"></span></div>
     <div class="navgrp"><div id="attn-slot"></div>
     <nav class="tabs" aria-label="Views">
       <a href="#census" data-view="census">Census</a>
@@ -416,6 +416,7 @@ table.arch td{white-space:normal}
     </nav><div id="bell-slot"></div></div>
     <div class="actions">
       <button class="btn primary" id="btn-add">Add client</button>
+      <button type="button" class="prog-btn" id="prog-btn" data-prog-toggle><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M7 7h11.2l-2.6-2.6L17 3l5 5-5 5-1.4-1.4L18.2 9H7V7Zm10 10H5.8l2.6 2.6L7 21l-5-5 5-5 1.4 1.4L5.8 15H17v2Z"/></svg><span id="prog-to"></span></button>
     </div>
   </header>
   <section class="stats" id="stats" aria-label="Census numbers"></section>
@@ -895,7 +896,7 @@ function setView(html){
 }
 function renderProgram(){
   $('#prog-title').textContent=`Census - ${PROGRAMS[PROG].name}`;document.title=`Census - ${PROGRAMS[PROG].name}`;
-  document.querySelectorAll('[data-prog]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.prog===PROG));
+  const to=PROG==='sud'?'mh':'sud';$('#prog-to').textContent=PROGRAMS[to].name;const pb=$('#prog-btn');pb.title=`Switch to Census - ${PROGRAMS[to].name}`;pb.setAttribute('aria-label',pb.title);pb.dataset.to=to;
   document.body.classList.toggle('prog-mh',PROG==='mh');
 }
 function render(){
@@ -1192,7 +1193,7 @@ document.addEventListener('click',e=>{
   const gt=t.closest('[data-goto-today]');if(gt){e.preventDefault();weekMode='3';weekShift=0;try{localStorage.setItem('census-weekmode','3')}catch(e){}
     if(location.hash!=='#schedule')location.hash='#schedule';else render();
     setTimeout(()=>{const d=document.querySelector('.day.today')||document.querySelector('.week .day');if(d)window.scrollTo({top:Math.max(0,d.getBoundingClientRect().top+scrollY-90),behavior:'smooth'})},60);return}
-  const pg=t.closest('[data-prog]');if(pg){switchProgram(pg.dataset.prog);return}
+  const pg=t.closest('[data-prog-toggle]');if(pg){switchProgram(pg.dataset.to);return}
   const rbl=t.closest('[data-rowbell]');
   if(rbl){const open=$('#rowpop');if(open&&open.dataset.id===rbl.dataset.rowbell){open.remove();return}showRowPop(rbl);return}
   if($('#rowpop')&&!t.closest('#rowpop'))$('#rowpop').remove();
