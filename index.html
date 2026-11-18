@@ -149,6 +149,8 @@ td .lvl{font-weight:700;color:var(--c)}
 
 /* Census rows */
 table.census td{vertical-align:middle}
+.tablewrap.scroll{max-height:max(360px,calc(100vh - 140px));overflow:auto;overscroll-behavior:contain}
+table.census thead th{position:sticky;top:0;z-index:2;box-shadow:inset 0 -1px 0 var(--line)}
 table.census tbody tr{cursor:default}
 table.census tbody tr td:first-child{box-shadow:inset 4px 0 0 var(--c)}
 table.census tr.dc td{color:var(--muted)}
@@ -589,7 +591,7 @@ function renderCensus(){
   const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['','Pending',...GROUPS,'Discharged'].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l?cvar(l):'var(--accent)'}">${l||'All'} <span>${l?n(l):state.clients.filter(c=>visible(c)&&recentDc(c)).length}</span></button>`).join('')}</div>`;
   return renderAttention(state.clients.filter(visible))+`<div class="tbar">${chips}<p>Change LOC right in the row. Click a name for full details.</p>
     <button class="btn small" id="btn-copy">Copy as spreadsheet (CSV)</button></div>
-  <div class="tablewrap"><table class="census"><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
+  <div class="tablewrap scroll"><table class="census"><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
   <tbody>${rows.map(c=>`<tr style="--c:${cvar(c.loc)}" class="${c.loc==='Discharged'?'dc':''}">${COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="${COLS.length}" class="of">No clients match these filters.</td></tr>`}</tbody></table></div>`;
 }
 function render(){
