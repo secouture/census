@@ -227,14 +227,13 @@ button.stat[aria-expanded="true"]{border-color:var(--accent);box-shadow:0 0 0 3p
   body.v-settings .set-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 6px 16px 0}
 }
 .set-scroll{display:flex;flex-direction:column;gap:14px}
-/* MH schedule: white day columns with an outline and soft shadow (like the stat boxes) so they stand off the tinted page;
-   client chips switch to a light fill with a thin border so they still read on white */
-body.prog-mh .day,body.prog-mh .day-h{background:var(--surface)}
-body.prog-mh .day{border:1px solid color-mix(in srgb,var(--prog) 22%,var(--line));box-shadow:var(--shadow);padding:11px}
-body.prog-mh .day.today{border:2px solid color-mix(in srgb,var(--prog) 55%,transparent);padding:10px}
-body.prog-mh .day.over,body.prog-mh .day.over .day-h{background:color-mix(in srgb,var(--prog) 8%,var(--surface))}
-body.prog-mh .day.over{border-color:var(--prog)}
-body.prog-mh .day .chip{background:color-mix(in srgb,var(--prog) 5%,var(--sunk));box-shadow:none;border:1px solid color-mix(in srgb,var(--prog) 12%,var(--line))}
+/* Schedule (both programs): white day columns with an outline and soft shadow (like the stat boxes) so they stand off the tinted page;
+   client chips switch to a light fill with a thin border so they still read on white */.week .day,.week .day-h{background:var(--surface)}
+.week .day{border:1px solid color-mix(in srgb,var(--prog) 22%,var(--line));box-shadow:var(--shadow);padding:11px}
+.week .day.today{border:2px solid color-mix(in srgb,var(--prog) 55%,transparent);padding:10px}
+.week .day.over,.week .day.over .day-h{background:color-mix(in srgb,var(--prog) 8%,var(--surface))}
+.week .day.over{border-color:var(--prog)}
+.week .day .chip{background:color-mix(in srgb,var(--prog) 5%,var(--sunk));box-shadow:none;border:1px solid color-mix(in srgb,var(--prog) 12%,var(--line))}
 /* Full week: six days side by side; narrow windows scroll sideways */
 .week:not(.three){grid-template-columns:repeat(6,minmax(190px,1fr));overflow-x:auto}
 .day-h{position:sticky;top:0;z-index:3;background:var(--sunk);margin:-10px -10px 0;padding:10px 12px 8px;border-radius:10px 10px 0 0}
