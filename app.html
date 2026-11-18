@@ -215,8 +215,8 @@ button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px 
 .week:not(.three) .chip .dot{width:6px;height:6px}
 .wkbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin:0 0 10px}
 .wkmid{display:flex;align-items:center;gap:10px;justify-self:center}
-.wkbar .seg.wk{justify-self:end}
-@media (max-width:560px){.wkbar{grid-template-columns:1fr}.wkspace{display:none}.wkmid,.wkbar .seg.wk{justify-self:center}.wkbar .seg.wk{grid-row:1}}
+.wkbar .seg.wk,.wkbar #btn-reset{justify-self:end}
+@media (max-width:560px){.wkbar{grid-template-columns:1fr}.wkspace{display:none}.wkmid,.wkbar .seg.wk,.wkbar #btn-reset{justify-self:center}}
 .seg.wk{display:inline-flex}
 .seg.wk button{padding:6px 14px;white-space:nowrap}
 .wknav{display:flex;gap:4px}
@@ -832,9 +832,13 @@ function renderCensus(){
 /* Puts the view's HTML in place. On the Week view the search/filter bar sits between the legend and the calendar. */
 function setView(html){
   const fl=$('.filters'), vw=$('#view'), a=document.activeElement, keep=a&&fl.contains(a), ss=keep?a.selectionStart:null;
+  const rb=$('#btn-reset');if(rb.parentNode!==fl)fl.appendChild(rb);
+  fl.querySelectorAll('.seg.wk').forEach(x=>x.remove());
   if(fl.parentNode!==vw.parentNode)vw.parentNode.insertBefore(fl,vw);
   vw.innerHTML=html;
-  if(view==='schedule'){const lg=vw.querySelector('.legend');if(lg)lg.after(fl)}
+  if(view==='schedule'){const lg=vw.querySelector('.legend');if(lg)lg.after(fl);
+    /* Week view: the 3-day/Full week switch sits in the filter row, Reset sample data takes its place up top */
+    const seg=vw.querySelector('.wkbar .seg.wk');if(seg){seg.replaceWith(rb);fl.appendChild(seg)}}
   fl.classList.toggle('in-week',view==='schedule');
   if(keep&&document.activeElement!==a){a.focus();try{if(ss!=null)a.setSelectionRange(ss,ss)}catch(e){}}
 }
