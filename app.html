@@ -35,7 +35,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.wrap{max-width:1440px;margin:0 auto}
+.wrap{margin:0 auto}
 .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 
 .notice{margin:12px 0 0;padding:8px 12px;border:1px dashed var(--line);border-radius:8px;color:var(--muted);font-size:12.5px;background:var(--surface)}
@@ -474,6 +474,8 @@ td.ur-td{padding-top:2px;padding-bottom:2px}
 .ur-in{width:74px;font-family:inherit;font-size:inherit;letter-spacing:inherit;font-variant-numeric:inherit}
 .ur-in::placeholder{color:color-mix(in srgb,var(--muted) 60%,transparent)}
 .ur-in.bad{border-color:var(--crit);background:color-mix(in srgb,var(--crit) 8%,var(--surface))}
+/* Tables fill the full page width on wide screens */
+table.census{min-width:100%}
 /* Settings */
 .set-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
 .set-top .set-h{margin:0}
@@ -493,7 +495,7 @@ td.ur-td{padding-top:2px;padding-bottom:2px}
 .daypick{display:flex;flex-wrap:wrap;gap:6px}
 .locpick label b{color:var(--c)}
 .daypick label{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:8px;padding:4px 9px;background:var(--surface);font-size:13px;cursor:pointer}
-.settings{display:flex;flex-direction:column;gap:14px;max-width:980px}
+.settings{display:flex;flex-direction:column;gap:14px}
 .set-h{font-family:var(--f-display);font-size:20px;margin:6px 0 0}
 .set-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
 .set-card h3{margin:0 0 4px;font-size:15px}
