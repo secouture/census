@@ -721,7 +721,7 @@ function sample(){
     if(r[3]!=null){const to=FIRST[r[0]]||NEXT_LOC[r[1]];plans.push({date:addDays(TODAY,r[3]),loc:to,days:[...DEFAULT_DAYS[to]],blocks:normBlocks(to,DEFAULT_DAYS[to],{})})}
     (LATER[r[0]]||[]).forEach(([l,o])=>plans.push({date:addDays(TODAY,o),loc:l,days:[...DEFAULT_DAYS[l]],blocks:normBlocks(l,DEFAULT_DAYS[l],uniform(DEFAULT_DAYS[l],'PM'))}));
     return {
-    id:'c'+(i+1), name:r[0], loc:r[1], plans, admitDate:addDays(TODAY,r[2]),
+    id:'c'+(i+1), name:r[0], loc:r[1], plans, admitDate:addDays(TODAY,r[2]), nextUr:r[1]==='Pending'?'':addDays(TODAY,(i*3)%11+1),
     dcDate:r[13]!=null?addDays(TODAY,r[4]):calcDc(addDays(TODAY,r[2]),r[10]),
     days:D(r[5]), clinician:CLIN[r[6]], caseManager:CM[r[7]], psychApn:APN[r[8]],
     referral:r[9], commitDays:r[10], commitNote:r[11], housing:r[12],
@@ -758,7 +758,7 @@ function sampleArchive(){
 var auditBase=null, auditAs=null;
 const AUDIT_USER='Prototype user';
 const AUDIT_MAX=5000;
-const AUD_FIELDS={name:'Name',loc:'LOC',housing:'Residence',admitDate:'Admission date',dcDate:'Projected DC',commitDays:'Incoming commitment (days)',commitNote:'Plan of care',
+const AUD_FIELDS={name:'Name',loc:'LOC',housing:'Residence',admitDate:'Admission date',nextUr:'Next UR',dcDate:'Projected DC',commitDays:'Incoming commitment (days)',commitNote:'Plan of care',
   clinician:'Clinician',caseManager:'Case manager',psychApn:'Psych APN',referral:'Referral source',dischargedOn:'Date of discharge',dcType:'Discharge type',dcCompleted:'Completed commitment?',dcLonger:'Longer than commitment?',failNote:'What happened'};
 const audClone=()=>{const {audit,...rest}=state;return JSON.parse(JSON.stringify(rest))};
 function auditBaseline(){auditBase=audClone()}
@@ -1112,7 +1112,7 @@ function renderSchedule(){
 const COLS=[
   ['name','Client',c=>c.name],['alert','Alerts',c=>{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return f.length?sev[f[0].lvl]:9}],
   ['loc','LOC',c=>c.loc],
-  ['admitDate','Admitted',c=>c.admitDate],['los','LOS',c=>losDays(c)||''],
+  ['admitDate','Admitted',c=>c.admitDate],['los','LOS',c=>losDays(c)||''],['nextUr','Next UR',c=>!isDC(c)&&c.nextUr||'9'],
   ['stepDown','Proj. step-down',c=>nextPlan(c)?.date||'9'],['dcDate','Proj. DC',c=>c.dcDate],
   ['days','Schedule',c=>c.days.map(d=>DAYS.indexOf(d)+BLOCK_ORDER.indexOf(blk(c,d))/10).join('')],
   ['clinician','Clinician',c=>c.clinician],['caseManager','Case manager',c=>c.caseManager],['psychApn','Psych APN',c=>c.psychApn],['housing','Residence',c=>c.housing],
@@ -1131,6 +1131,7 @@ function cell(c,k){
     case 'loc':return isDC(c)?`<td><span class="loc-sel static" style="--c:${cvar(c.loc)}">${c.loc}</span><span class="of"> · discharged</span></td>`:`<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${pickLocs(c.loc).map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
     case 'housing':return `<td><select class="h-sel ${c.housing==='LPD'?'lpd':''}" data-row-house="${c.id}" aria-label="Residence for ${esc(c.name)}"><option ${c.housing==='LPD'?'selected':''}>LPD</option><option ${c.housing!=='LPD'?'selected':''}>Commuter</option></select></td>`;
     case 'admitDate':return `<td class="mono">${fmt(c.admitDate)}</td>`;
+    case 'nextUr':return `<td class="mono">${isDC(c)?'—':fmt(c.nextUr)}</td>`;
     case 'los':return `<td class="mono">${losDays(c)||'—'}</td>`;
     case 'stepDown':{if(isDC(c))return '<td><span class="of">n/a</span></td>';const np=nextPlan(c);
       return `<td><button class="plan-link" data-plan="${c.id}" title="Schedule LOC changes">${np?`<span class="mono">${fmt(np.date)}</span> → <b style="color:${cvar(np.loc)}">${np.loc==='Discharged'?'DC':np.loc}</b>${c.plans.length>1?` <span class="of">+${c.plans.length-1}</span>`:''}`:'<span class="add">+ Schedule</span>'}</button></td>`}
@@ -1286,6 +1287,7 @@ function renderDrawer(){
         <div class="fld"><label for="d-admit">Admission date</label><input id="d-admit" type="date" data-f="admitDate" value="${c.admitDate}"></div>
         <div class="fld"><span class="lbl">Projected step-down</span>${isDC(c)?'<span class="of">n/a</span>':`<button type="button" class="plan-link boxed" data-plan="${c.id}">${nextPlan(c)?`${fmt(nextPlan(c).date)} → ${nextPlan(c).loc}${c.plans.length>1?` (+${c.plans.length-1})`:''}`:'+ Schedule a change'}</button>`}</div>
         <div class="fld"><label for="d-dc">Projected DC</label><input id="d-dc" type="date" data-f="dcDate" value="${c.dcDate}"><span class="help">Set from admission + LOS, kept off weekends. You can change it.</span></div>
+        <div class="fld"><label for="d-ur">Next UR</label><input id="d-ur" type="date" data-f="nextUr" value="${c.nextUr||''}"><span class="help">Date of the next utilization review.</span></div>
         ${isActive(c)?`<div class="fld full"><span class="lbl">Schedule · ${freq(c)}</span><button type="button" class="plan-link boxed" data-sched="${c.id}">${schedHTML(c)||'+ Set days and times'}</button></div>`:''}
       </div>
       <div class="sec-h">Care team</div>
@@ -1543,7 +1545,7 @@ document.addEventListener('keydown',e=>{
 });
 function addClient(){
   snap();const id='n'+(state.seq++);
-  state.clients.push({id,name:'New client',loc:'Pending',plans:[],admitDate:addDays(TODAY,1),dcDate:'',days:[],blocks:{},clinician:'',caseManager:'',psychApn:'',referral:'',commitDays:0,commitNote:'',housing:'Commuter',dischargedOn:'',history:[{date:TODAY,text:'Referral entered'}]});
+  state.clients.push({id,name:'New client',loc:'Pending',plans:[],admitDate:addDays(TODAY,1),dcDate:'',nextUr:'',days:[],blocks:{},clinician:'',caseManager:'',psychApn:'',referral:'',commitDays:0,commitNote:'',housing:'Commuter',dischargedOn:'',history:[{date:TODAY,text:'Referral entered'}]});
   save();if(view!=='census')location.hash='#census';render();openClient(id);
   setTimeout(()=>{const n=$('#d-name');n?.focus();n?.select()},10);
 }
@@ -1639,11 +1641,12 @@ function parseCsv(text){
   if(cell||row.length){row.push(cell);rows.push(row)}
   return rows.filter(r=>r.some(x=>String(x).trim()));
 }
-const FIELD_LABEL={name:'Client name',admitDate:'Admission date',stepDown:'Projected step-down',dcDate:'Projected DC',loc:'LOC',freq:'Frequency',days:'Schedule',clinician:'Clinician',caseManager:'Case manager',psychApn:'Psych APN',referral:'Referral source',commit:'Incoming commitment',housing:'Residence (LPD/commuter)'};
+const FIELD_LABEL={name:'Client name',admitDate:'Admission date',nextUr:'Next UR',stepDown:'Projected step-down',dcDate:'Projected DC',loc:'LOC',freq:'Frequency',days:'Schedule',clinician:'Clinician',caseManager:'Case manager',psychApn:'Psych APN',referral:'Referral source',commit:'Incoming commitment',housing:'Residence (LPD/commuter)'};
 function matchHeader(h){
   const s=String(h).toLowerCase().replace(/[^a-z]/g,'');
   if(!s)return null;
   if(/step/.test(s))return 'stepDown';
+  if(/^(next)?ur(date)?$|utiliz|review/.test(s))return 'nextUr';
   if(/dc|discharg/.test(s))return 'dcDate';
   if(/admi|start/.test(s))return 'admitDate';
   if(/freq/.test(s))return 'freq';
@@ -1719,7 +1722,7 @@ function previewRows(rows){
     const st=String(g('days')).toLowerCase(), hint=/6\s*-\s*9|eve|night/.test(st)?'EVE':/12:30|after|pm/.test(st)?'PM':'AM';
     const dd=LEVELS.includes(loc)?parseDays(g('days'),loc):[];
     if(plans[0])plans[0].blocks=normBlocks(plans[0].loc,plans[0].days,{});
-    return {id:'i'+(state.seq++),name,loc,plans,blocks:normBlocks(loc,dd,uniform(dd,hint)),admitDate:parseDate(g('admitDate')),dcDate:parseDate(g('dcDate'))||(loc!=='Discharged'?calcDc(parseDate(g('admitDate')),cm.commitDays):''),
+    return {id:'i'+(state.seq++),name,loc,plans,blocks:normBlocks(loc,dd,uniform(dd,hint)),admitDate:parseDate(g('admitDate')),nextUr:parseDate(g('nextUr'))||'',dcDate:parseDate(g('dcDate'))||(loc!=='Discharged'?calcDc(parseDate(g('admitDate')),cm.commitDays):''),
       days:dd,clinician:String(g('clinician')||'').trim(),caseManager:String(g('caseManager')||'').trim(),psychApn:String(g('psychApn')||'').trim(),
       referral:String(g('referral')||'').trim(),...cm,housing:/lpd|resid|sober|house|yes/i.test(String(g('housing')))?'LPD':'Commuter',
       dischargedOn:loc==='Discharged'?(parseDate(g('dcDate'))||TODAY):'',history:[{date:TODAY,text:'Imported from spreadsheet'}],
