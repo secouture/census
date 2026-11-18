@@ -406,8 +406,8 @@ table.arch td{white-space:normal}
   <div class="filters">
     <input id="f-search" type="search" placeholder="Search name, referral, staff…" aria-label="Search">
     <select id="f-staff" aria-label="Filter by staff"></select>
-    <select id="f-house" aria-label="Filter by housing">
-      <option value="">All housing</option><option value="LPD">LPD only</option><option value="Commuter">Commuters only</option>
+    <select id="f-house" aria-label="Filter by residence">
+      <option value="">All residences</option><option value="LPD">LPD only</option><option value="Commuter">Commuters only</option>
     </select>
     <span class="spacer"></span>
     <button class="btn small" id="btn-reset">Reset sample data</button>
@@ -602,7 +602,7 @@ function flags(c){
   return f;
 }
 /* Profile fields every client card should have filled in */
-const REQUIRED=[['clinician','clinician'],['caseManager','case manager'],['psychApn','psych APN'],['referral','referral source'],['commitDays','incoming commitment'],['housing','housing']];
+const REQUIRED=[['clinician','clinician'],['caseManager','case manager'],['psychApn','psych APN'],['referral','referral source'],['commitDays','incoming commitment'],['housing','residence']];
 function missingInfo(c,f){const m=REQUIRED.filter(([k])=>!c[k]).map(([,l])=>l);if(m.length)f.push({lvl:'warn',text:`Missing ${m.join(', ')}`})}
 const sev={crit:0,warn:1,info:2};
 
@@ -696,7 +696,7 @@ function renderStats(){
   $('#stats').innerHTML=
     `<div class="stat wide"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${GROUPS.map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
     `<div class="stat"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${admToday}</div><div class="s">admits today</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DCs today</div></div></div></div>`+
-    `<div class="stat"><div class="k">Housing</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
+    `<div class="stat"><div class="k">Residence</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
     `<a href="#schedule" class="stat link" data-goto-today title="Open today in the 3-day week view"><div class="k">Expected today</div><div class="v">${tk==='sun'?'—':todayCount}</div><div class="s">${tk==='sun'?'no groups Sunday · ':'scheduled · '}<u>see schedule →</u></div></a>`+
     '';
   const wk=weekEvents(), wkLeft=wk.days.reduce((n,d)=>n+(d.date>=TODAY?d.ev.length:0),0);
@@ -794,7 +794,7 @@ function renderSchedule(){
 }
 const COLS=[
   ['name','Client',c=>c.name],['alert','Alerts',c=>{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return f.length?sev[f[0].lvl]:9}],
-  ['loc','LOC',c=>c.loc],['housing','Housing',c=>c.housing],
+  ['loc','LOC',c=>c.loc],['housing','Residence',c=>c.housing],
   ['admitDate','Admitted',c=>c.admitDate],['los','Day #',c=>losDays(c)||''],
   ['stepDown','Proj. step-down',c=>nextPlan(c)?.date||'9'],['dcDate','Proj. DC',c=>c.dcDate],
   ['days','Schedule',c=>c.days.map(d=>DAYS.indexOf(d)+BLOCK_ORDER.indexOf(blk(c,d))/10).join('')],
@@ -812,7 +812,7 @@ function cell(c,k){
     case 'name':return `<td class="nm"><button class="linkish" data-open="${c.id}">${esc(c.name)}</button></td>`;
     case 'alert':{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return `<td>${f.length?`<span class="flag ${f[0].lvl}">${esc(f[0].text)}${f.length>1?` +${f.length-1}`:''}</span>`:''}</td>`}
     case 'loc':return c.loc==='Discharged'?`<td><span class="loc-sel static">Discharged</span>${c.lastLoc?`<span class="of"> from ${c.lastLoc}</span>`:''}</td>`:`<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
-    case 'housing':return `<td><select class="h-sel ${c.housing==='LPD'?'lpd':''}" data-row-house="${c.id}" aria-label="Housing for ${esc(c.name)}"><option ${c.housing==='LPD'?'selected':''}>LPD</option><option ${c.housing!=='LPD'?'selected':''}>Commuter</option></select></td>`;
+    case 'housing':return `<td><select class="h-sel ${c.housing==='LPD'?'lpd':''}" data-row-house="${c.id}" aria-label="Residence for ${esc(c.name)}"><option ${c.housing==='LPD'?'selected':''}>LPD</option><option ${c.housing!=='LPD'?'selected':''}>Commuter</option></select></td>`;
     case 'admitDate':return `<td class="mono">${fmt(c.admitDate)}</td>`;
     case 'los':return `<td class="mono">${losDays(c)?losDays(c)+(c.commitDays?`<span class="of">/${c.commitDays}</span>`:''):'—'}</td>`;
     case 'stepDown':{if(c.loc==='Discharged')return '<td><span class="of">n/a</span></td>';const np=nextPlan(c);
@@ -952,7 +952,7 @@ function renderDrawer(){
       <div class="grid2">
         <div class="fld full"><label for="d-name">Client name</label><input id="d-name" data-f="name" value="${esc(c.name)}"></div>
         <div class="fld"><label for="d-loc">Level of care</label>${c.loc==='Discharged'?`<input id="d-loc" value="Discharged${c.lastLoc?` (from ${c.lastLoc})`:''}" disabled><span class="help">Clear the date of discharge to return the client to the census.</span>`:`<select id="d-loc" data-loc-select>${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select>`}</div>
-        <div class="fld"><span class="lbl">Housing</span><div class="seg">${['LPD','Commuter'].map(h=>`<button type="button" data-house="${h}" aria-pressed="${c.housing===h}">${h}</button>`).join('')}</div></div>
+        <div class="fld"><span class="lbl">Residence</span><div class="seg">${['LPD','Commuter'].map(h=>`<button type="button" data-house="${h}" aria-pressed="${c.housing===h}">${h}</button>`).join('')}</div></div>
         <div class="fld"><label for="d-admit">Admission date</label><input id="d-admit" type="date" data-f="admitDate" value="${c.admitDate}"></div>
         <div class="fld"><span class="lbl">Projected step-down</span>${c.loc==='Discharged'?'<span class="of">n/a</span>':`<button type="button" class="plan-link boxed" data-plan="${c.id}">${nextPlan(c)?`${fmt(nextPlan(c).date)} → ${nextPlan(c).loc}${c.plans.length>1?` (+${c.plans.length-1})`:''}`:'+ Schedule a change'}</button>`}</div>
         <div class="fld"><label for="d-dc">Projected DC</label><input id="d-dc" type="date" data-f="dcDate" value="${c.dcDate}"><span class="help">Set from admission + LOS, kept off weekends. You can change it.</span></div>
@@ -1012,7 +1012,7 @@ document.addEventListener('change',e=>{
     if(k==='loc'&&pl.loc&&pl.loc!=='Discharged'){pl.days=[...DEFAULT_DAYS[pl.loc]];pl.blocks=normBlocks(pl.loc,pl.days,{})}
     if(k!=='date')renderPlanner();return}
   if(e.target.matches('[data-row-loc]')){moveLoc(e.target.dataset.rowLoc,e.target.value);return}
-  if(e.target.matches('[data-row-house]')){const r=byId(e.target.dataset.rowHouse);snap();r.housing=e.target.value;r.history.push({date:TODAY,text:`Housing changed to ${r.housing}`});save();render();toast(`${r.name} now marked ${r.housing}.`,true);return}
+  if(e.target.matches('[data-row-house]')){const r=byId(e.target.dataset.rowHouse);snap();r.housing=e.target.value;r.history.push({date:TODAY,text:`Residence changed to ${r.housing}`});save();render();toast(`${r.name} now marked ${r.housing}.`,true);return}
   if(e.target.matches('[data-loc-select]')&&c){moveLoc(c.id,e.target.value);return}
   if(e.target.matches('[data-staff-edit]')){const k=e.target.dataset.staffEdit,i=+e.target.dataset.i,old=state.staff[k][i],n=e.target.value.trim();
     if(!n||n===old){e.target.value=old;return}
@@ -1253,7 +1253,7 @@ document.addEventListener('contextmenu',e=>{if(drag&&drag.touch)e.preventDefault
 
 /* ---------- CSV export ---------- */
 function toCsv(){
-  const head=['Client name','Admission date','Projected step-down date','Next LOC','Projected DC date','LOC','Attendance days','Clinician','Case manager','Psych APN','Referral source','Incoming commitment','Commitment days','Housing','Date of discharge','Discharge type','Completed commitment?','Longer than commitment?'];
+  const head=['Client name','Admission date','Projected step-down date','Next LOC','Projected DC date','LOC','Attendance days','Clinician','Case manager','Psych APN','Referral source','Incoming commitment','Commitment days','Residence','Date of discharge','Discharge type','Completed commitment?','Longer than commitment?'];
   const q=v=>{v=String(v??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
   const rows=state.clients.map(c=>[c.name,fmt(c.admitDate).replace('—',''),nextPlan(c)?fmt(nextPlan(c).date):'',nextPlan(c)?.loc||'',fmt(c.dcDate).replace('—',''),c.loc,schedSummary(c),c.clinician,c.caseManager,c.psychApn,c.referral,c.commitNote,c.commitDays||'',c.housing,c.dischargedOn?fmt(c.dischargedOn):'',c.dcType||'',c.dcCompleted||'',c.dcLonger||'']);
   return [head,...rows].map(r=>r.map(q).join(',')).join('\n');
@@ -1280,7 +1280,7 @@ function parseCsv(text){
   if(cell||row.length){row.push(cell);rows.push(row)}
   return rows.filter(r=>r.some(x=>String(x).trim()));
 }
-const FIELD_LABEL={name:'Client name',admitDate:'Admission date',stepDown:'Projected step-down',dcDate:'Projected DC',loc:'LOC',freq:'Frequency',days:'Schedule',clinician:'Clinician',caseManager:'Case manager',psychApn:'Psych APN',referral:'Referral source',commit:'Incoming commitment',housing:'Housing (LPD/commuter)'};
+const FIELD_LABEL={name:'Client name',admitDate:'Admission date',stepDown:'Projected step-down',dcDate:'Projected DC',loc:'LOC',freq:'Frequency',days:'Schedule',clinician:'Clinician',caseManager:'Case manager',psychApn:'Psych APN',referral:'Referral source',commit:'Incoming commitment',housing:'Residence (LPD/commuter)'};
 function matchHeader(h){
   const s=String(h).toLowerCase().replace(/[^a-z]/g,'');
   if(!s)return null;
@@ -1369,7 +1369,7 @@ function previewRows(rows){
   const found=Object.keys(FIELD_LABEL).filter(k=>map.includes(k)), missing=Object.keys(FIELD_LABEL).filter(k=>!map.includes(k)&&k!=='freq');
   box.innerHTML=`<p><b style="color:var(--ink)">${clients.length} clients found.</b> Columns matched:</p>
     <div class="maplist">${found.map(k=>`<span>${FIELD_LABEL[k]}</span>`).join('')}${missing.map(k=>`<span class="miss">No ${FIELD_LABEL[k]}</span>`).join('')}</div>
-    <div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>Client</th><th>LOC</th><th>Admitted</th><th>Schedule</th><th>Step-down</th><th>Clinician</th><th>Housing</th></tr></thead>
+    <div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>Client</th><th>LOC</th><th>Admitted</th><th>Schedule</th><th>Step-down</th><th>Clinician</th><th>Residence</th></tr></thead>
     <tbody>${clients.slice(0,5).map(c=>`<tr><td>${esc(c.name)}</td><td>${c.loc}</td><td class="mono">${fmt(c.admitDate)}</td><td>${schedSummary(c)||'—'}</td><td>${c.plans[0]?`${fmt(c.plans[0].date)} → ${c.plans[0].loc}`:'—'}</td><td>${esc(c.clinician)||'—'}</td><td>${c.housing}</td></tr>`).join('')}</tbody></table></div>
     ${clients.length>5?`<p>…and ${clients.length-5} more.</p>`:''}
     <div class="actions" style="margin-top:10px"><button class="btn primary" id="imp-add">Add ${clients.length} to census</button><button class="btn" id="imp-replace">Replace census with these ${clients.length}</button></div>`;
