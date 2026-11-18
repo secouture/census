@@ -207,6 +207,9 @@ table.census tr.dc td{color:var(--muted)}
 .toast button+button{margin-left:-4px}
 
 /* Discharge */
+.scrim.top{z-index:58}
+.confirm-modal{z-index:62;width:min(460px,calc(100% - 32px))}
+.btn.danger-fill{background:var(--crit);border-color:var(--crit);color:var(--surface)}
 .failnote{width:100%;min-width:220px;border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:6px 8px;font-size:13px;resize:vertical;white-space:normal}
 table.arch td{white-space:normal}
 .confirm .failnote{flex:1 1 100%}
@@ -298,6 +301,7 @@ table.arch td{white-space:normal}
   <main id="view"></main>
 </div>
 <div id="layer"></div>
+<div id="confirm-slot"></div>
 <div id="toast-slot"></div>
 
 <script>
@@ -710,9 +714,24 @@ function openArchived(id){
   setTimeout(()=>$('.drawer .x')?.focus(),0);
 }
 
+function renderConfirm(c){
+  const kind=archiveKind(c);
+  $('#confirm-slot').innerHTML=`<div class="scrim top" data-del-no></div>
+  <div class="modal confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="cr-title">
+    <h2 id="cr-title">Confirm census removal</h2>
+    ${kind?`<p>Remove <b>${esc(c.name)}</b> from the census? Their record will be archived under <b>${kind==='incomplete'?'Incomplete admissions':'Discharges'}</b>, and you can restore it from the Archive tab.</p>
+      ${kind==='incomplete'?`<div class="fld"><label for="d-failnote">What happened with this admission? (optional)</label><textarea id="d-failnote" class="failnote" rows="3"></textarea></div>`:''}
+      <div class="actions"><span style="flex:1"></span><button class="btn" data-del-no>Cancel</button><button class="btn primary danger-fill" data-del-yes>Confirm removal</button></div>`
+    :`<p class="err">${esc(c.name)} is still active in ${c.loc}. Enter a date of discharge on their card before removing them from the census.</p>
+      <div class="actions"><span style="flex:1"></span><button class="btn primary" data-del-no>OK</button></div>`}
+  </div>`;
+  setTimeout(()=>($('#d-failnote')||$('.confirm-modal [data-del-no]'))?.focus(),0);
+}
+
 /* ---------- drawer ---------- */
 let confirmDel=false;
-function closeLayer(){openId=null;confirmDel=false;$('#layer').innerHTML=''}
+function closeLayer(){openId=null;closeConfirm();$('#layer').innerHTML=''}
+function closeConfirm(){confirmDel=false;$('#confirm-slot').innerHTML=''}
 function openClient(id){openId=id;confirmDel=false;renderDrawer();setTimeout(()=>$('.drawer .x')?.focus(),0)}
 function renderDrawer(){
   const c=byId(openId);if(!c){closeLayer();return}
@@ -757,7 +776,7 @@ function renderDrawer(){
       </div>
       <div class="sec-h">History</div>
       <ul class="hist">${[...c.history].reverse().map(h=>`<li><span class="mono">${fmt(h.date)}</span><span>${esc(h.text)}</span></li>`).join('')}</ul>
-      <div class="confirm">${confirmDel?(archiveKind(c)?`Archive ${esc(c.name)} under ${archiveKind(c)==='incomplete'?'<b>Incomplete admissions</b>':'<b>Discharges</b>'} and remove them from the census? ${archiveKind(c)==='incomplete'?`<textarea id="d-failnote" class="failnote" rows="2" placeholder="What happened with this admission? (optional)"></textarea>`:''}<button class="btn small danger" data-del-yes>Archive</button><button class="btn small" data-del-no>Cancel</button>`:`<span class="err">Enter a date of discharge before removing ${esc(c.name)} from the census.</span><button class="btn small" data-del-no>OK</button>`):`<button class="btn small danger" data-del>Remove from census</button>`}</div>
+      <div class="confirm"><button class="btn small danger" data-del>Remove from census</button></div>
     </div>
   </aside>`;
   $('.drawer-b').scrollTop=scroll;
@@ -914,8 +933,8 @@ document.addEventListener('click',e=>{
   const th=t.closest('th[data-sort]');
   if(th){const k=th.dataset.sort;sort=sort.k===k?{k,dir:-sort.dir}:{k,dir:1};render();return}
   if(t.closest('[data-house]')&&c){c.housing=t.closest('[data-house]').dataset.house;save();render();return}
-  if(t.closest('[data-del]')){confirmDel=true;renderDrawer();return}
-  if(t.closest('[data-del-no]')){confirmDel=false;renderDrawer();return}
+  if(t.closest('[data-del]')&&c){confirmDel=true;renderConfirm(c);return}
+  if(t.closest('[data-del-no]')){closeConfirm();return}
   if(t.closest('[data-del-yes]')&&c){const kind=archiveKind(c);if(!kind)return;snap();
     c.history.push({date:TODAY,text:`Archived under ${kind==='incomplete'?'Incomplete admissions':'Discharges'}`});
     const fn=($('#d-failnote')?.value||'').trim();
@@ -933,6 +952,7 @@ document.addEventListener('click',e=>{
   if(t.id==='btn-copy'){copyCsv(t);return}
 });
 document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&$('#confirm-slot').innerHTML){closeConfirm();return}
   if(e.key==='Escape'&&$('#layer').innerHTML)closeLayerOrPlanner();
   if((e.key==='Enter'||e.key===' ')&&e.target.matches('.card')){e.preventDefault();openClient(e.target.dataset.id)}
 });
