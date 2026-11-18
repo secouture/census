@@ -68,6 +68,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .stat.alert .v{color:var(--crit)}
 .stats{position:relative}
 .stat.wide{grid-column:span 2}
+.stat .split{display:flex;gap:18px}
+.stat .split>div+div{padding-left:18px;border-left:1px solid var(--line)}
 .stat .pills{margin-top:4px}
 .stat .pill{font-size:12px;padding:2px 7px}
 button.stat{font:inherit;color:inherit;text-align:left;cursor:pointer}
@@ -443,7 +445,7 @@ function sample(){
     ['Wyatt Ferris','IOP6',-14,21,50,W6,1,1,1,'Alumni referral',56,'IOP 8 wks','Commuter'],
     ['Nadia Vance','OP',-58,null,5,'tue',2,2,0,'Detox center',56,'PC 3 wks, IOP 5 wks','Commuter'],
     ['Oliver Grant','OP',-71,null,-2,'thu',3,0,1,'Inpatient psych unit',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
-    ['Simone Achebe','OP',-49,null,20,'tue',0,1,0,'EAP',84,'PC 4 wks, IOP 4 wks, OP 4 wks','Commuter'],
+    ['Simone Achebe','OP',-83,null,0,'tue',0,1,0,'EAP',84,'PC 4 wks, IOP 4 wks, OP 4 wks','Commuter'],
     ['Ben Okonkwo','OP',-64,null,13,'wed',1,2,1,'Family',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
     ['Riley Starr','Discharged',-60,null,-3,'',2,0,0,'Hospital ED',56,'PC 3 wks, IOP 5 wks','Commuter',-3],
     ['Frances Iwu','Discharged',-75,null,-8,'',3,1,1,'Detox center',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD',-8],
@@ -604,12 +606,13 @@ function renderStats(){
   const act=state.clients.filter(c=>LEVELS.includes(c.loc));
   const n=l=>state.clients.filter(c=>group(c.loc)===l).length;
   const lpd=act.filter(c=>c.housing==='LPD').length;
+  const dcToday=act.filter(c=>c.dcDate===TODAY).length;
   const tk=dayKey(TODAY), todayCount=act.filter(c=>c.days.includes(tk)).length;
   const attn=state.clients.filter(c=>recentDc(c)&&flags(c).some(f=>f.lvl!=='info')).length;
   const st=(k,v,s,cls='',sw='')=>`<div class="stat ${cls}"><div class="k">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   $('#stats').innerHTML=
     `<div class="stat wide"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${GROUPS.map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
-    st('Pending',n('Pending'),'incoming admits','',cvar('Pending'))+
+    `<div class="stat"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${n('Pending')}</div><div class="s">admits</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DC today</div></div></div></div>`+
     st('LPD',lpd,`${act.length-lpd} commuters`)+
     st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
     `<button type="button" class="stat ${attn?'alert':''}" data-attn aria-expanded="${attnOpen}" aria-controls="attn-pop"><div class="k">Needs attention</div><div class="v">${attn}</div><div class="s">${attnOpen?'click to close':'click to see list'}</div></button>`+
