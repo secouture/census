@@ -121,6 +121,11 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .day-h .dd{color:var(--muted);font-size:12px;margin-left:6px}
 .day-h .cnt{font-size:12px;color:var(--muted);margin-top:2px}
 .day-h .cnt b{color:var(--ink);font-family:var(--f-display);font-size:15px}
+.pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.pill{white-space:nowrap;font-size:11px;font-weight:600;padding:1px 6px;border-radius:5px;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent)}
+.pill b{font-weight:700;font-variant-numeric:tabular-nums}
+.pill.lpd{--c:var(--muted);background:var(--surface);border:1px solid var(--line)}
+.pill.zero{opacity:.45}
 .mix{display:flex;height:5px;border-radius:3px;overflow:hidden;margin-top:6px;background:var(--line)}
 .chip{display:flex;align-items:center;gap:7px;background:var(--surface);border-radius:7px;padding:5px 8px;font-size:13px;cursor:grab;user-select:none;-webkit-user-select:none;box-shadow:var(--shadow);border:0;text-align:left;width:100%;touch-action:manipulation}
 .chip{flex-wrap:wrap;row-gap:2px}
@@ -620,7 +625,8 @@ function renderSchedule(){
     const mix=cs.length?GROUPS.map(g=>`<span style="width:${by(g)/cs.length*100}%;background:var(${GROUP_VAR[g]})"></span>`).join(''):'';
     return `<section class="day ${date===TODAY?'today':''}" aria-label="${DAY_LABEL[k]}">
       <div class="day-h"><span class="dn">${DAY_LABEL[k]}</span><span class="dd">${fmt(date)}${date===TODAY?' · today':''}</span>
-        <div class="cnt"><b>${cs.length}</b> expected · ${GROUPS.map(g=>`${g} ${by(g)}`).join(' · ')} · LPD ${lpd}</div>
+        <div class="cnt"><b>${cs.length}</b> expected</div>
+        <div class="pills">${GROUPS.map(g=>`<span class="pill ${by(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})">${g} <b>${by(g)}</b></span>`).join('')}<span class="pill lpd ${lpd?'':'zero'}">LPD <b>${lpd}</b></span></div>
         <div class="mix">${mix}</div></div>
       ${BLOCK_ORDER.filter(b=>b!=='EVE'||EVE_DAYS.includes(k)).map(b=>{const ss=cs.filter(c=>blk(c,k)===b);return `<div class="ses" data-drop="day" data-day="${k}" data-block="${b}"><div class="ses-h">${BLOCKS[b].n} <span class="t">${BLOCKS[b].t}</span><span class="n">${ss.length}</span></div>
         ${ss.map(c=>`<button class="chip" style="--c:${cvar(c.loc)}" data-drag="sched" data-id="${c.id}" data-day="${k}" title="${esc(c.name)}"><span class="dot"></span><span class="cn">${esc(c.name)}</span><span class="tags">${c.housing==='LPD'?'<span class="h">LPD</span>':''}<span class="lv">${c.loc}</span></span></button>`).join('')}</div>`}).join('')}
