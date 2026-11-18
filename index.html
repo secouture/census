@@ -54,6 +54,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .tabs a{padding:6px 14px;border-radius:7px;text-decoration:none;color:var(--muted);font-weight:600;font-size:13px}
 .tabs a.gear{display:inline-flex;align-items:center;padding:6px 9px}
 body.v-settings #stats,body.v-settings .filters{display:none}
+.filters.in-week{margin:6px 0 12px}
 .tabs a[aria-current="page"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
 .btn{border:1px solid var(--line);background:var(--surface);padding:7px 12px;border-radius:8px;font-weight:600;font-size:13px}
 .btn:hover{border-color:var(--muted)}
@@ -835,13 +836,22 @@ function renderCensus(){
   <div class="tablewrap scroll"><table class="census"><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
   <tbody>${rows.map(c=>`<tr style="--c:${cvar(c.loc)}" class="${c.loc==='Discharged'?'dc':''}">${COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="${COLS.length}" class="of">No clients match these filters.</td></tr>`}</tbody></table></div>`;
 }
+/* Puts the view's HTML in place. On the Week view the search/filter bar sits between the legend and the calendar. */
+function setView(html){
+  const fl=$('.filters'), vw=$('#view'), a=document.activeElement, keep=a&&fl.contains(a), ss=keep?a.selectionStart:null;
+  if(fl.parentNode!==vw.parentNode)vw.parentNode.insertBefore(fl,vw);
+  vw.innerHTML=html;
+  if(view==='schedule'){const lg=vw.querySelector('.legend');if(lg)lg.after(fl)}
+  fl.classList.toggle('in-week',view==='schedule');
+  if(keep&&document.activeElement!==a){a.focus();try{if(ss!=null)a.setSelectionRange(ss,ss)}catch(e){}}
+}
 function render(){
   $('#today').textContent=`${pISO(TODAY).toLocaleDateString('en-US',{weekday:'long'})} ${fmt(TODAY)}`;
   document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.view===view?'page':'false'));
   document.body.classList.toggle('v-settings',view==='settings');
   document.body.classList.toggle('v-schedule',view==='schedule');
   renderStats();renderStaffFilter();
-  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='archive'?renderArchive():view==='settings'?renderSettings():renderCensus();
+  setView(view==='schedule'?renderSchedule():view==='archive'?renderArchive():view==='settings'?renderSettings():renderCensus());
   if(openId)renderDrawer();
 }
 
@@ -991,7 +1001,7 @@ function setField(c,f,v){
   save();
   const keepFocus=document.activeElement?.id;
   renderStats();renderStaffFilter();
-  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='archive'?renderArchive():view==='settings'?renderSettings():renderCensus();
+  setView(view==='schedule'?renderSchedule():view==='archive'?renderArchive():view==='settings'?renderSettings():renderCensus());
   if(f!=='name'&&f!=='referral'&&f!=='commitNote'){renderDrawer();if(keepFocus)document.getElementById(keepFocus)?.focus()}
   else $('.drawer-h h2').textContent=c.name;
 }
