@@ -219,7 +219,17 @@ button.stat[aria-expanded="true"]{border-color:var(--accent);box-shadow:0 0 0 3p
   body.v-census .tablewrap.scroll{flex:1;min-height:0;max-height:none;margin-bottom:16px}
   body.v-schedule .week{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding-bottom:16px;align-content:start;grid-auto-rows:max-content}
   body.v-schedule .day>*{flex-shrink:0}
+  /* Settings: title, program switch and the "You're editing" line stay put; the cards below scroll */
+  body.v-settings{height:100vh;height:100dvh;overflow:hidden;padding-bottom:0;margin:0;box-sizing:border-box;padding-top:8px}
+  body.v-settings .wrap{height:100%;display:flex;flex-direction:column}
+  body.v-settings #view{flex:1;min-height:0;display:flex;flex-direction:column}
+  body.v-settings .settings{flex:1;min-height:0}
+  body.v-settings .set-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 6px 16px 0}
 }
+.set-scroll{display:flex;flex-direction:column;gap:14px}
+/* MH schedule: lavender day columns (darker than the page tint) so they stand apart; white client chips pop on top */
+body.prog-mh .day,body.prog-mh .day-h{background:color-mix(in srgb,var(--prog) 14%,var(--surface))}
+body.prog-mh .day.over,body.prog-mh .day.over .day-h{background:color-mix(in srgb,var(--prog) 22%,var(--surface))}
 /* Full week: six days side by side; narrow windows scroll sideways */
 .week:not(.three){grid-template-columns:repeat(6,minmax(190px,1fr));overflow-x:auto}
 .day-h{position:sticky;top:0;z-index:3;background:var(--sunk);margin:-10px -10px 0;padding:10px 12px 8px;border-radius:10px 10px 0 0}
@@ -915,6 +925,7 @@ function renderSettings(){
   return `<div class="settings">
   <div class="set-top"><h2 class="set-h">Settings</h2><div class="set-prog" role="group" aria-label="Program settings">${Object.entries(PROGRAMS).map(([k,v])=>`<button type="button" data-set-prog="${k}" aria-pressed="${k===PROG}"><span class="pm-dot ${k}">${v.name}</span>Census - ${v.name}</button>`).join('')}</div></div>
   <p class="set-note">You're editing settings for <b>Census - ${pn}</b>. Each program keeps its own staff and schedule settings.</p>
+  <div class="set-scroll">
   <section class="set-card"><h3>Staff · ${pn}</h3><p class="help">These lists fill the Clinician, Case manager and Psych APN dropdowns on each client's card. Renaming someone updates every client assigned to them. Removing someone takes them off the dropdown only; clients already assigned keep the name until you reassign them.</p>
   <div class="staff-grid">${STAFF_ROLES.map(([k,plural,one])=>`<div class="staff-col"><h4>${plural} <span>${state.staff[k].length}</span></h4>
     <ul>${state.staff[k].map((n,i)=>`<li><input value="${esc(n)}" data-staff-edit="${k}" data-i="${i}" aria-label="${one} name"><span class="cl" title="Active clients assigned">${cnt(k,n)}</span><button type="button" class="x" data-staff-del="${k}" data-i="${i}" aria-label="Remove ${esc(n)}">×</button></li>`).join('')||'<li class="empty">No one yet</li>'}</ul>
@@ -930,7 +941,7 @@ function renderSettings(){
   </div></section>
   <section class="set-card"><h3>Import spreadsheet</h3><p class="help">Bring in clients from an Excel (.xlsx) or CSV file, or paste rows copied from Excel. Columns are matched by their headings and you see a preview before anything is added. New staff names in the file are added to the staff lists.</p>
   <button class="btn primary" id="btn-import">Import spreadsheet</button></section>
-  </div>`;
+  </div></div>`;
 }
 function renderWeekOverview(wk){
   const tot=t=>wk.days.reduce((n,d)=>n+d.ev.filter(e=>e.t===t).length,0);
