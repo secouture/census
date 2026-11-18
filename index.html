@@ -147,6 +147,24 @@ td .lvl{font-weight:700;color:var(--c)}
 .tbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
 .tbar p{margin:0 auto 0 0;color:var(--muted);font-size:13px}
 
+/* Census rows */
+table.census td{vertical-align:middle}
+table.census tbody tr{cursor:default}
+table.census tbody tr td:first-child{box-shadow:inset 4px 0 0 var(--c)}
+table.census tr.dc td{color:var(--muted)}
+.linkish{border:0;background:none;padding:0;font-weight:600;color:var(--ink);text-align:left;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.linkish:hover{text-decoration-color:var(--accent)}
+.loc-sel,.h-sel{border:1px solid color-mix(in srgb,var(--c) 45%,var(--line));background:color-mix(in srgb,var(--c) 12%,var(--surface));color:var(--c);font-weight:700;border-radius:6px;padding:4px 6px;font-size:13px}
+.h-sel{--c:var(--muted);font-weight:600}
+.h-sel.lpd{--c:var(--php)}
+.of{color:var(--muted);font-size:11.5px}
+.locfilter{display:flex;flex-wrap:wrap;gap:4px}
+.locfilter button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:600;color:var(--c)}
+.locfilter button span{color:var(--muted);font-weight:500;margin-left:2px}
+.locfilter button[aria-pressed="true"]{background:var(--c);border-color:var(--c);color:var(--surface)}
+.locfilter button[aria-pressed="true"] span{color:inherit;opacity:.8}
+.tbar p{flex:1 1 200px}
+
 /* Drawer */
 .scrim{position:fixed;inset:0;background:rgba(10,18,22,.35);z-index:40}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);background:var(--surface);z-index:50;box-shadow:-8px 0 30px rgba(0,0,0,.18);display:flex;flex-direction:column;
@@ -207,9 +225,8 @@ td .lvl{font-weight:700;color:var(--c)}
   <header class="top">
     <div class="brand"><h1>Census</h1><span class="date" id="today"></span></div>
     <nav class="tabs" aria-label="Views">
-      <a href="#board" data-view="board">Board</a>
+      <a href="#census" data-view="census">Census</a>
       <a href="#schedule" data-view="schedule">Week</a>
-      <a href="#table" data-view="table">Spreadsheet</a>
     </nav>
     <div class="actions">
       <button class="btn" id="btn-import">Import spreadsheet</button>
@@ -337,7 +354,7 @@ function flags(c){
 const sev={crit:0,warn:1,info:2};
 
 /* ---------- filters ---------- */
-const F={q:'',staff:'',house:''};
+const F={q:'',staff:'',house:'',loc:''};
 function visible(c){
   if(F.house&&c.housing!==F.house)return false;
   if(F.staff&&![c.clinician,c.caseManager,c.psychApn].includes(F.staff))return false;
@@ -382,7 +399,7 @@ function moveDay(id,fromDay,toDay){
 
 /* ---------- rendering ---------- */
 const $=s=>document.querySelector(s);
-let view='board', sort={k:'loc',dir:1}, openId=null;
+let view='census', sort={k:'loc',dir:1}, openId=null;
 
 function renderStats(){
   const act=state.clients.filter(c=>LEVELS.includes(c.loc));
@@ -410,42 +427,12 @@ function renderStaffFilter(){
   sel.innerHTML=`<option value="">All staff</option>${grp('Clinicians','clinician')}${grp('Case managers','caseManager')}${grp('Psych APNs','psychApn')}`;
   sel.value=cur;
 }
-function daysDots(c){return `<span class="days">${DAYS.map(d=>`<i class="${c.days.includes(d)?'on':''}">${DAY_SHORT[d]}</i>`).join('')}<span class="freq">${freq(c)}</span></span>`}
-function card(c){
-  const fl=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);
-  const los=losDays(c);
-  let dates='';
-  if(c.loc==='Pending')dates=`<div class="dates"><span>Admit <b>${fmt(c.admitDate)}</b></span><span>${esc(c.referral)}</span></div>`;
-  else if(c.loc==='Discharged')dates=`<div class="dates"><span>DC'd <b>${fmt(c.dischargedOn)}</b></span><span>${los} days total</span></div>`;
-  else dates=`<div class="dates">${c.loc!=='OP'?`<span>Step-down <b>${fmt(c.stepDown)}</b></span>`:''}<span>DC <b>${fmt(c.dcDate)}</b></span></div>`;
-  const pct=c.commitDays&&los?Math.min(100,Math.round(los/c.commitDays*100)):0;
-  const bar=LEVELS.includes(c.loc)&&c.commitDays?`<div class="bar ${los>c.commitDays?'over':''}" title="Day ${los} of ${c.commitDays}-day commitment"><span style="width:${pct}%"></span></div>`:'';
-  const meta=c.loc==='Discharged'?esc(c.clinician):c.loc==='Pending'?`${esc(c.clinician)} · ${esc(c.commitNote||'No commitment noted')}`:`${los?`Day ${los}${c.commitDays?` of ${c.commitDays}`:''} · `:''}${esc(c.clinician)}`;
-  return `<div class="card" style="--c:${cvar(c.loc)}" data-drag="client" data-id="${c.id}" tabindex="0" role="button" aria-label="${esc(c.name)}, ${c.loc}. Open details">
-    <div class="card-top"><span class="name">${esc(c.name)}</span><span class="tag ${c.housing==='LPD'?'lpd':'com'}">${c.housing==='LPD'?'LPD':'Commuter'}</span></div>
-    <div class="meta">${meta}</div>
-    ${LEVELS.includes(c.loc)?daysDots(c):''}
-    ${dates}${bar}
-    ${fl.length?`<span class="flag ${fl[0].lvl}">${esc(fl[0].text)}${fl.length>1?` +${fl.length-1}`:''}</span>`:''}
-  </div>`;
-}
+function daysDots(c){return `<span class="days" style="--c:${cvar(c.loc)}">${DAYS.map(d=>`<i class="${c.days.includes(d)?'on':''}">${DAY_SHORT[d]}</i>`).join('')}</span>`}
 function renderAttention(list){
   const items=[];
   list.filter(recentDc).forEach(c=>flags(c).filter(f=>f.lvl!=='info').forEach(f=>items.push({c,f})));
   items.sort((a,b)=>sev[a.f.lvl]-sev[b.f.lvl]||a.c.name.localeCompare(b.c.name));
   return `<section class="attn"><h2>Needs attention</h2>${items.length?`<ul>${items.map(({c,f})=>`<li><button data-open="${c.id}"><span class="flag ${f.lvl}" style="padding:0;background:none">${esc(f.text)}</span>${esc(c.name)} · ${c.loc}</button></li>`).join('')}</ul>`:'<p class="empty">Nothing due in the next few days.</p>'}</section>`;
-}
-function renderBoard(){
-  const list=state.clients.filter(visible);
-  const cols=LOCS.map(l=>{
-    let cs=list.filter(c=>c.loc===l&&recentDc(c));
-    cs.sort((a,b)=>l==='Pending'?(a.admitDate||'').localeCompare(b.admitDate||''):l==='Discharged'?(b.dischargedOn||'').localeCompare(a.dischargedOn||''):(a.stepDown||a.dcDate||'9').localeCompare(b.stepDown||b.dcDate||'9'));
-    return `<section class="col" style="--c:${cvar(l)}" data-drop="loc" data-loc="${l}" aria-label="${LOC_NAME[l]}">
-      <div class="col-h"><h3>${LOC_NAME[l]}</h3><span class="n">${cs.length}</span><span class="sub">${LOC_SUB[l]}</span></div>
-      ${cs.map(card).join('')||`<div class="hint">Drag a client here</div>`}
-    </section>`;
-  }).join('');
-  return renderAttention(list)+`<div class="board">${cols}</div>`;
 }
 function weekDates(){const d=pISO(TODAY);const dow=(d.getDay()+6)%7;const mon=addDays(TODAY,-dow);return DAYS.map((k,i)=>({k,date:addDays(mon,i)}))}
 function renderSchedule(){
@@ -465,32 +452,50 @@ function renderSchedule(){
   return legend+`<div class="week">${cols}</div>`;
 }
 const COLS=[
-  ['name','Client',c=>c.name],['loc','LOC',c=>c.loc],['housing','Housing',c=>c.housing],
+  ['name','Client',c=>c.name],['alert','Alerts',c=>{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return f.length?sev[f[0].lvl]:9}],
+  ['loc','LOC',c=>c.loc],['housing','Housing',c=>c.housing],
   ['admitDate','Admitted',c=>c.admitDate],['los','Day #',c=>losDays(c)||''],
   ['stepDown','Proj. step-down',c=>c.stepDown],['dcDate','Proj. DC',c=>c.dcDate],
-  ['freq','Frequency',c=>freq(c)],['days','Schedule',c=>c.days.map(d=>DAY_SHORT[d]).join(' ')],
+  ['freq','Freq.',c=>c.days.length],['days','Schedule',c=>c.days.map(d=>DAYS.indexOf(d)).join('')],
   ['clinician','Clinician',c=>c.clinician],['caseManager','Case manager',c=>c.caseManager],['psychApn','Psych APN',c=>c.psychApn],
-  ['referral','Referral source',c=>c.referral],['commit','Incoming commitment',c=>c.commitNote+(c.commitDays?` (${c.commitDays} days)`:'')],
+  ['referral','Referral source',c=>c.referral],['commit','Incoming commitment',c=>c.commitDays||0],
 ];
 function sortedRows(){
-  const list=state.clients.filter(c=>visible(c)&&recentDc(c));
+  const list=state.clients.filter(c=>visible(c)&&recentDc(c)&&(!F.loc||c.loc===F.loc));
   const col=COLS.find(x=>x[0]===sort.k);
   const val=c=>sort.k==='loc'?RANK[c.loc]:col[2](c);
   return list.sort((a,b)=>{const x=val(a),y=val(b);return (x>y?1:x<y?-1:a.name.localeCompare(b.name))*sort.dir});
 }
-function renderTable(){
+function cell(c,k){
+  switch(k){
+    case 'name':return `<td class="nm"><button class="linkish" data-open="${c.id}">${esc(c.name)}</button></td>`;
+    case 'alert':{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return `<td>${f.length?`<span class="flag ${f[0].lvl}">${esc(f[0].text)}${f.length>1?` +${f.length-1}`:''}</span>`:''}</td>`}
+    case 'loc':return `<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
+    case 'housing':return `<td><select class="h-sel ${c.housing==='LPD'?'lpd':''}" data-row-house="${c.id}" aria-label="Housing for ${esc(c.name)}"><option ${c.housing==='LPD'?'selected':''}>LPD</option><option ${c.housing!=='LPD'?'selected':''}>Commuter</option></select></td>`;
+    case 'admitDate':return `<td class="mono">${fmt(c.admitDate)}</td>`;
+    case 'los':return `<td class="mono">${losDays(c)?losDays(c)+(c.commitDays?`<span class="of">/${c.commitDays}</span>`:''):'—'}</td>`;
+    case 'stepDown':return `<td class="mono">${c.loc==='OP'||c.loc==='Discharged'?'<span class="of">n/a</span>':fmt(c.stepDown)}</td>`;
+    case 'dcDate':return `<td class="mono">${c.loc==='Discharged'?`DC'd ${fmt(c.dischargedOn)}`:fmt(c.dcDate)}</td>`;
+    case 'freq':return `<td>${freq(c)}</td>`;
+    case 'days':return `<td>${LEVELS.includes(c.loc)?daysDots(c):'—'}</td>`;
+    case 'commit':return `<td>${esc(c.commitNote)||'—'}</td>`;
+    default:return `<td>${esc(c[k])||'—'}</td>`;
+  }
+}
+function renderCensus(){
   const rows=sortedRows();
-  const isDate=k=>['admitDate','stepDown','dcDate'].includes(k);
-  return `<div class="tbar"><p>${rows.length} clients shown. Click a column to sort, or a row to edit.</p>
+  const n=l=>state.clients.filter(c=>c.loc===l&&visible(c)&&recentDc(c)).length;
+  const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['',...LOCS].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l?cvar(l):'var(--accent)'}">${l?LOC_NAME[l]:'All'} <span>${l?n(l):state.clients.filter(c=>visible(c)&&recentDc(c)).length}</span></button>`).join('')}</div>`;
+  return renderAttention(state.clients.filter(visible))+`<div class="tbar">${chips}<p>Change LOC right in the row. Click a name for full details.</p>
     <button class="btn small" id="btn-copy">Copy as spreadsheet (CSV)</button></div>
-  <div class="tablewrap"><table><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
-  <tbody>${rows.map(c=>`<tr data-open="${c.id}" style="--c:${cvar(c.loc)}">${COLS.map(([k,,f])=>{const v=f(c);return `<td class="${isDate(k)||k==='los'?'mono':''}">${k==='loc'?`<span class="lvl">${v}</span>`:isDate(k)?fmt(v):esc(v)||'—'}</td>`}).join('')}</tr>`).join('')}</tbody></table></div>`;
+  <div class="tablewrap"><table class="census"><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
+  <tbody>${rows.map(c=>`<tr style="--c:${cvar(c.loc)}" class="${c.loc==='Discharged'?'dc':''}">${COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="${COLS.length}" class="of">No clients match these filters.</td></tr>`}</tbody></table></div>`;
 }
 function render(){
   $('#today').textContent=pISO(TODAY).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.view===view?'page':'false'));
   renderStats();renderStaffFilter();
-  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='table'?renderTable():renderBoard();
+  $('#view').innerHTML=view==='schedule'?renderSchedule():renderCensus();
   if(openId)renderDrawer();
 }
 
@@ -544,12 +549,14 @@ function setField(c,f,v){
   c[f]=v;save();
   const keepFocus=document.activeElement?.id;
   renderStats();renderStaffFilter();
-  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='table'?renderTable():renderBoard();
+  $('#view').innerHTML=view==='schedule'?renderSchedule():renderCensus();
   if(f!=='name'&&f!=='referral'&&f!=='commitNote'){renderDrawer();if(keepFocus)document.getElementById(keepFocus)?.focus()}
   else $('.drawer-h h2').textContent=c.name;
 }
 document.addEventListener('change',e=>{
   const c=byId(openId);
+  if(e.target.matches('[data-row-loc]')){moveLoc(e.target.dataset.rowLoc,e.target.value);return}
+  if(e.target.matches('[data-row-house]')){const r=byId(e.target.dataset.rowHouse);snap();r.housing=e.target.value;r.history.push({date:TODAY,text:`Housing changed to ${r.housing}`});save();render();toast(`${r.name} now marked ${r.housing}.`,true);return}
   if(e.target.matches('[data-loc-select]')&&c){moveLoc(c.id,e.target.value);return}
   if(e.target.dataset.f&&c&&e.target.closest('.drawer'))setField(c,e.target.dataset.f,e.target.value);
 });
@@ -566,7 +573,9 @@ let suppressClick=false;
 document.addEventListener('click',e=>{
   if(suppressClick){suppressClick=false;e.preventDefault();return}
   const t=e.target;
+  if(t.closest('select'))return;
   const c=byId(openId);
+  const lf=t.closest('[data-locf]');if(lf){F.loc=lf.dataset.locf;render();return}
   if(t.closest('[data-close]')){closeLayer();return}
   const opener=t.closest('[data-open],[data-drag]');
   if(opener&&!t.closest('.drawer')&&!t.closest('.modal')){openClient(opener.dataset.open||opener.dataset.id);return}
@@ -588,7 +597,7 @@ document.addEventListener('keydown',e=>{
 $('#btn-add').addEventListener('click',()=>{
   snap();const id='n'+(state.seq++);
   state.clients.push({id,name:'New client',loc:'Pending',admitDate:addDays(TODAY,1),stepDown:'',dcDate:'',days:[],clinician:CLIN[0],caseManager:CM[0],psychApn:APN[0],referral:'',commitDays:0,commitNote:'',housing:'Commuter',dischargedOn:'',history:[{date:TODAY,text:'Referral entered'}]});
-  save();if(view!=='board')location.hash='#board';render();openClient(id);
+  save();if(view!=='census')location.hash='#census';render();openClient(id);
   setTimeout(()=>{const n=$('#d-name');n?.focus();n?.select()},10);
 });
 let resetArmed=false;
@@ -803,7 +812,7 @@ Sample Person C,${fmt2(3)},,,Pending,,,J. Lindqvist LMFT,S. Haddad,L. Moreau PMH
 function fmt2(n){const d=pISO(addDays(TODAY,n));return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`}
 
 /* ---------- routing ---------- */
-function route(){const h=location.hash.slice(1);view=['board','schedule','table'].includes(h)?h:'board';render()}
+function route(){const h=location.hash.slice(1);view=h==='schedule'?'schedule':'census';render()}
 addEventListener('hashchange',route);
 route();
 })();

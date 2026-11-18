@@ -6,10 +6,9 @@ A census board for a behavioral health program with PHP, IOP and OP levels of ca
 
 ## What it does
 
-- **Board.** One column per level of care: Pending, PHP, IOP, OP and Discharged. Drag a client card to another column to admit, step down, step up or discharge them. On a move the app fills in the defaults automatically: the attendance schedule (PHP Mon–Fri, IOP Mon/Wed/Thu, OP Tue), the frequency, the next projected step-down date, and the discharge date. Every automatic change can be undone from the message that appears.
+- **Census.** One row per client, like the Excel sheet. Change a client's LOC or housing right in the row with a dropdown. When LOC changes, the app fills in the defaults automatically: the attendance schedule (PHP Mon–Fri, IOP Mon/Wed/Thu, OP Tue), the frequency, the next projected step-down date, and the discharge date. Every automatic change can be undone. Filter by LOC, sort by any column, or copy the census as CSV to paste into Excel.
 - **Needs attention.** Overdue or upcoming step-downs, upcoming or overdue discharges, admissions due tomorrow, clients past their incoming commitment, and clients without a schedule.
 - **Week.** Who is expected each day, with counts by level of care and how many live in LPD. Drag a name from one day to another to change that client's schedule.
-- **Spreadsheet.** All fields in a sortable table, plus a button that copies the census as CSV to paste into Excel.
 - **Import.** Upload an Excel (.xlsx) or CSV file, or paste rows copied from Excel. Columns are matched by their headings, and you see a preview before anything is added.
 - **Client details.** Click any client to edit name, LOC, housing (LPD or commuter), admission, step-down and DC dates, schedule, clinician, case manager, psych APN, referral source and incoming commitment. Each client keeps a history of moves.
 - **Filters.** Search, filter by any staff member (with caseload counts), and filter LPD or commuters.
