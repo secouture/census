@@ -824,7 +824,7 @@ const COLS=[
   ['referral','Referral source',c=>c.referral],['commit','Incoming commitment',c=>c.commitDays||0],
 ];
 function sortedRows(){
-  const list=state.clients.filter(c=>visible(c)&&recentDc(c)&&(!F.loc||group(c.loc)===F.loc));
+  const list=state.clients.filter(c=>visible(c)&&recentDc(c)&&(F.loc?group(c.loc)===F.loc:LEVELS.includes(c.loc)));
   const col=COLS.find(x=>x[0]===sort.k);
   const val=c=>sort.k==='loc'?RANK[c.loc]:col[2](c);
   return list.sort((a,b)=>{const x=val(a),y=val(b);return (x>y?1:x<y?-1:a.name.localeCompare(b.name))*sort.dir});
@@ -848,7 +848,7 @@ function cell(c,k){
 function renderCensus(){
   const rows=sortedRows();
   const n=l=>state.clients.filter(c=>group(c.loc)===l&&visible(c)&&recentDc(c)).length;
-  const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['','Pending',...GROUPS,'Discharged'].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l?cvar(l):'var(--accent)'}">${l||'All'} <span>${l?n(l):state.clients.filter(c=>visible(c)&&recentDc(c)).length}</span></button>`).join('')}</div>`;
+  const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['Pending','',...GROUPS,'Discharged'].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l?cvar(l):'var(--accent)'}" ${l?'':'title="Everyone in PC, IOP, EIOP or OP (not Pending or Discharged)"'}>${l||'Active'} <span>${l?n(l):state.clients.filter(c=>visible(c)&&LEVELS.includes(c.loc)).length}</span></button>`).join('')}</div>`;
   return `<div class="tbar">${chips}<p>Change LOC right in the row. Click a name for full details.</p>
     <button class="btn small" id="btn-copy">Copy as spreadsheet (CSV)</button></div>
   <div class="tablewrap scroll"><table class="census"><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
