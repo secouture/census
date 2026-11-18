@@ -285,6 +285,15 @@ table.census tbody tr:hover td{background:color-mix(in srgb,var(--accent) 6%,var
 table.census tbody tr{cursor:default}
 table.census tbody tr td:first-child{box-shadow:inset 4px 0 0 var(--c),inset -1px 0 0 var(--line)}
 table.census tr.dc td{color:var(--muted)}
+/* Compact census + archive tables */
+table.census{font-size:12px}
+table.census td{padding:4px 8px;line-height:1.35}
+table.census th{padding:6px 8px;font-size:10.5px}
+table.census .loc-sel,table.census .h-sel{font-size:12px;padding:2px 4px;border-radius:5px}
+table.census .flag{font-size:11px}
+table.census .row-bell{padding:3px 5px}
+table.census .row-bell svg{width:13px;height:13px}
+table.census .btn.small{padding:3px 8px;font-size:12px}
 .linkish{border:0;background:none;padding:0;font-weight:600;color:var(--ink);text-align:left;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
 .linkish:hover{text-decoration-color:var(--accent)}
 .loc-sel,.h-sel{border:1px solid color-mix(in srgb,var(--c) 45%,var(--line));background:color-mix(in srgb,var(--c) 12%,var(--surface));color:var(--c);font-weight:700;border-radius:6px;padding:4px 6px;font-size:13px}
@@ -339,6 +348,7 @@ table.census tr.dc td{color:var(--muted)}
 .btn.danger-fill{background:var(--crit);border-color:var(--crit);color:var(--surface)}
 .failnote{width:100%;min-width:220px;border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:6px 8px;font-size:13px;resize:vertical;white-space:normal}
 table.arch td{white-space:normal}
+table.arch td:first-child{white-space:nowrap}
 .confirm .failnote{flex:1 1 100%}
 .dcbox{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .dcbox.need{border-color:color-mix(in srgb,var(--warn) 55%,var(--line));background:color-mix(in srgb,var(--warn) 6%,transparent)}
