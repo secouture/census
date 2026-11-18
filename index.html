@@ -867,7 +867,6 @@ function flags(c){
   else if(group(c.loc)!=='OP')f.push({lvl:'info',text:'No step-down scheduled'});
   if(c.dcDate){const d=diff(TODAY,c.dcDate);
     if(d<0)f.push({lvl:'crit',text:`DC ${-d}d overdue`});else if(d<=7)f.push({lvl:'info',text:d===0?'DC today':`DC in ${d}d`})}
-  if(c.commitDays&&losDays(c)>c.commitDays)f.push({lvl:'warn',text:'Past incoming commitment'});
   if(!c.days.length)f.push({lvl:'warn',text:'No schedule set'});
   else if(EXPECT[c.loc]&&c.days.length!==EXPECT[c.loc])f.push({lvl:'warn',text:`${c.loc} with ${c.days.length} day${c.days.length>1?'s':''} scheduled`});
   if(!c.dcDate)f.push({lvl:'warn',text:'No projected DC date'});
