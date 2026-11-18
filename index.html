@@ -67,6 +67,9 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .stat .s{font-size:12px;color:var(--muted)}
 .stat.alert .v{color:var(--crit)}
 .stats{position:relative}
+.stat.wide{grid-column:span 2}
+.stat .pills{margin-top:4px}
+.stat .pill{font-size:12px;padding:2px 7px}
 button.stat{font:inherit;color:inherit;text-align:left;cursor:pointer}
 button.stat:hover{border-color:var(--muted)}
 button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 15%,transparent)}
@@ -605,8 +608,7 @@ function renderStats(){
   const attn=state.clients.filter(c=>recentDc(c)&&flags(c).some(f=>f.lvl!=='info')).length;
   const st=(k,v,s,cls='',sw='')=>`<div class="stat ${cls}"><div class="k">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   $('#stats').innerHTML=
-    st('Active census',act.length,'all levels of care')+
-    GROUPS.map(g=>st(g,n(g),GROUP_SUB[g],'',`var(${GROUP_VAR[g]})`)).join('')+
+    `<div class="stat wide"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${GROUPS.map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
     st('Pending',n('Pending'),'incoming admits','',cvar('Pending'))+
     st('LPD',lpd,`${act.length-lpd} commuters`)+
     st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
