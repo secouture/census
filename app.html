@@ -101,8 +101,8 @@ a.stat.link{text-decoration:none;color:inherit;cursor:pointer}
 a.stat.link:hover{border-color:var(--accent)}
 a.stat.link u{color:var(--accent);text-decoration:none;font-weight:600}
 button.stat{font:inherit;color:inherit;text-align:left;cursor:pointer}
-button.stat:hover{border-color:var(--muted)}
-button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 15%,transparent)}
+button.stat:hover{border-color:var(--accent)}
+button.stat[aria-expanded="true"]{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}
 .navgrp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .wk-btn{display:inline-flex;align-items:center;gap:6px;border:0;background:var(--accent);color:var(--accent-ink);border-radius:9px;padding:7px 11px;font:inherit;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap}
 .wk-btn b{min-width:20px;padding:0 6px;border-radius:999px;background:color-mix(in srgb,var(--accent-ink) 22%,transparent);font-size:12px;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
@@ -410,8 +410,12 @@ body{--prog-soft:color-mix(in srgb,var(--prog) 20%,var(--surface));--prog-soft-i
 .wk-btn b{background:color-mix(in srgb,var(--prog) 22%,transparent)}
 .wk-btn:hover,.stat.add-tile:hover{filter:none;background:color-mix(in srgb,var(--prog) 28%,var(--surface))}
 .wk-btn[aria-expanded="true"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--prog) 30%,transparent),0 0 0 3px color-mix(in srgb,var(--prog) 25%,transparent)}
-.num-link{border:0;background:none;padding:0;font:inherit;font-family:var(--f-display);cursor:pointer;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;text-decoration-color:color-mix(in srgb,currentColor 35%,transparent);display:block}
-.num-link:hover,.num-link[aria-expanded="true"]{text-decoration-color:currentColor}
+.pend-btn{display:block;line-height:normal}
+.pend-btn .k{justify-content:space-between}
+.pend-btn .k u{color:var(--accent);text-decoration:none;font-weight:600;text-transform:none;letter-spacing:0}
+.pl-h{margin:10px 8px 2px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.pl-h span{color:var(--ink)}
+.pl-meta{display:block;font-size:12px;color:var(--muted);font-weight:400}
 /* Settings */
 .set-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
 .set-top .set-h{margin:0}
@@ -805,11 +809,12 @@ function runScheduled(){
 const admitsToday=()=>state.clients.filter(c=>c.loc==='Pending'&&c.admitDate===TODAY);
 const dcsToday=()=>state.clients.filter(c=>c.dischargedOn?c.dischargedOn===TODAY:(isActive(c)&&c.dcDate===TODAY));
 /* Pop-up behind the Pending box numbers: who is admitting / discharging today */
-function renderTodayList(k){
-  const adm=k==='adm', list=adm?admitsToday():dcsToday(), title=adm?'Admissions today':'Discharges today';
-  const meta=c=>adm?[c.commitDays?`LOS ${c.commitDays} days`:'',c.housing,c.referral?`from ${esc(c.referral)}`:'',c.clinician].filter(Boolean).join(' · ')
-    :[c.dischargedOn?'discharged today':'projected DC today', c.admitDate?`admitted ${fmt(c.admitDate)}`:'', c.clinician].filter(Boolean).join(' · ');
-  return `<div class="attn-pop" id="attn-pop" role="dialog" aria-label="${title}"><h2>${title} · ${fmt(TODAY)}<button type="button" data-pop="${k}" aria-label="Close">×</button></h2><p class="pop-sub">${adm?'Pending clients scheduled to admit today.':'Clients with a discharge or projected DC date of today.'} Click a name to open their card.</p>${list.length?`<ul>${list.map(c=>`<li><button data-open="${c.id}"><span class="an">${esc(c.name)} <span>· ${c.loc}</span></span><span class="flag info" style="padding:0;background:none">${meta(c)}</span></button></li>`).join('')}</ul>`:'<p class="empty">No one today.</p>'}</div>`;
+function renderTodayList(){
+  const sec=(title,list,meta,empty)=>`<h3 class="pl-h">${title} <span>${list.length}</span></h3>${list.length?`<ul>${list.map(c=>`<li><button data-open="${c.id}"><span class="an">${esc(c.name)} <span>· ${c.loc}</span></span><span class="pl-meta">${meta(c)}</span></button></li>`).join('')}</ul>`:`<p class="empty">${empty}</p>`}`;
+  const am=c=>[c.commitDays?`LOS ${c.commitDays} days`:'',c.housing,c.referral?`from ${esc(c.referral)}`:'',c.clinician].filter(Boolean).join(' · ');
+  const dm=c=>[c.dischargedOn?'discharged today':'projected DC today',c.admitDate?`admitted ${fmt(c.admitDate)}`:'',c.clinician].filter(Boolean).join(' · ');
+  return `<div class="attn-pop" id="attn-pop" role="dialog" aria-label="Pending today"><h2>Pending today · ${fmt(TODAY)}<button type="button" data-pop="today" aria-label="Close">×</button></h2><p class="pop-sub">Click a name to open their card.</p>
+  ${sec('Admissions',admitsToday(),am,'No admissions scheduled today.')}${sec('Discharges',dcsToday(),dm,'No discharges today.')}</div>`;
 }
 const $=s=>document.querySelector(s);
 let view='census', sort={k:'loc',dir:1}, openId=null;
@@ -820,14 +825,13 @@ function renderStats(){
   const n=l=>state.clients.filter(c=>group(c.loc)===l&&!isDC(c)).length;
   const lpd=act.filter(c=>c.housing==='LPD').length;
   const admToday=admitsToday().length, dcToday=dcsToday().length;
-  const num=(v,k,color,label)=>v?`<button type="button" class="v num-link" data-pop="${k}" aria-expanded="${pop===k}" style="color:${color}" title="Show ${label}" aria-label="${v} ${label}: show list">${v}</button>`:`<div class="v" style="color:${color}">${v}</div>`;
   const tk=dayKey(TODAY), todayCount=act.filter(c=>c.days.includes(tk)).length;
   const attn=state.clients.filter(c=>recentDc(c)&&flags(c).some(f=>f.lvl!=='info')).length;
   const st=(k,v,s,cls='',sw='')=>`<div class="stat ${cls}"><div class="k">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   $('#stats').innerHTML=
     `<button type="button" class="stat add-tile" data-add-client title="Add a client" aria-label="Add client"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="currentColor" d="M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.6-7 4v2h11.1a6 6 0 0 1-.1-1c0-1.9.9-3.6 2.3-4.7A13 13 0 0 0 10 14Zm9 0h-2v3h-3v2h3v3h2v-3h3v-2h-3v-3Z"/></svg><span>Add client</span></button>`+
     `<div class="stat"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${shownGroups().map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
-    `<div class="stat"><div class="k">Pending</div><div class="split"><div>${num(admToday,'adm',cvar('Pending'),'admissions today')}<div class="s">admits today</div></div><div>${num(dcToday,'dct','var(--dc)','discharges today')}<div class="s">DCs today</div></div></div></div>`+
+    `<button type="button" class="stat link pend-btn" data-pop="today" aria-expanded="${pop==='today'}" title="Show today's admissions and discharges"><div class="k">Pending <u>view list →</u></div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${admToday}</div><div class="s">admits today</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DCs today</div></div></div></button>`+
     `<div class="stat"><div class="k">Residence</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
     `<a href="#schedule" class="stat link" data-goto-today title="Open today in the 3-day week view"><div class="k">Expected today</div><div class="v">${tk==='sun'?'—':todayCount}</div><div class="s">${tk==='sun'?'no groups Sunday · ':'scheduled · '}<u>see schedule →</u></div></a>`+
     '';
