@@ -453,6 +453,9 @@ button.stat.pend-btn[aria-expanded="true"]{border-color:var(--prog);background:c
 table.census thead th,table.census thead th:first-child{background:color-mix(in srgb,var(--prog) 24%,var(--surface));color:color-mix(in srgb,var(--prog) 55%,var(--ink));box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--prog) 40%,transparent)}
 table.census thead th:first-child{box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--prog) 40%,transparent),inset -1px 0 0 var(--line)}
 .bopts button.stale{border-style:dashed;border-color:var(--warn);color:var(--warn)}
+.save-status{margin-left:8px;font-weight:600;font-size:12px}
+.save-status.pending{color:var(--warn)}
+.save-status.saved{color:var(--op)}
 /* Settings */
 .set-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
 .set-top .set-h{margin:0}
@@ -576,7 +579,7 @@ function sampleFor(){const cs=sample();if(PROG!=='mh')return cs;cs.forEach((c,i)
 function sampleArchiveFor(){const a=sampleArchive();if(PROG!=='mh')return a;a.forEach((c,i)=>{c.name=MH_NAMES[24+i]||c.name});return a}
 function switchProgram(p){
   if(!PROGRAMS[p]||p===PROG)return;
-  save();PROG=p;KEY=PROGRAMS[p].key;try{localStorage.setItem('census-program',p)}catch(e){}
+  save();saveState='';PROG=p;KEY=PROGRAMS[p].key;try{localStorage.setItem('census-program',p)}catch(e){}
   state=load();undoSnap=null;openId=null;pop=null;F.q='';F.staff='';F.house='';F.loc='';
   $('#f-search').value='';$('#f-house').value='';$('#layer').innerHTML='';$('#rowpop')?.remove();
   runScheduled();render();toast(`Switched to Census - ${PROGRAMS[p].name}.`);
@@ -736,7 +739,13 @@ function ensureStaff(s){s.sched=s.sched||SCHED_DEFAULT();s.staff=s.staff||{clini
   ['clinician','caseManager','psychApn'].forEach(k=>{s.staff[k]=s.staff[k]||[];s.clients.forEach(c=>{if(c[k]&&!s.staff[k].includes(c[k]))s.staff[k].push(c[k])})});return s}
 function migrate(s){s.clients.forEach(c=>{if(c.loc==='Discharged'){c.loc=LEVELS.includes(c.lastLoc)?c.lastLoc:'OP';c.dcDone=true}});s.archive.forEach(a=>{if(a.locAtRemoval==='Discharged')a.locAtRemoval=LEVELS.includes(a.lastLoc)?a.lastLoc:'OP';if(a.loc==='Discharged')a.loc=a.locAtRemoval});return s}
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients)){s.archive=s.archive||[];return ensureStaff(migrate(s))}}catch(e){}return ensureStaff({clients:sampleFor(),archive:sampleArchiveFor(),seq:100})}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+function save(){clearTimeout(saveTimer);saveTimer=null;try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+/* Settings changes save 5 seconds after the last change (other pages save right away). A status line on Settings shows it. */
+let saveTimer=null, saveState='';
+function setSaveStatus(t){saveState=t;const el=document.getElementById('save-status');if(el){el.textContent=t==='pending'?'Saving in a few seconds…':t==='saved'?'All changes saved':'';el.className='save-status '+t}}
+function saveSoon(){clearTimeout(saveTimer);setSaveStatus('pending');saveTimer=setTimeout(()=>{save();setSaveStatus('saved')},5000)}
+addEventListener('beforeunload',()=>{if(saveTimer)save()});
+addEventListener('pagehide',()=>{if(saveTimer)save()});
 const byId=id=>state.clients.find(c=>c.id===id);
 let undoSnap=null;
 function snap(){undoSnap=JSON.stringify(state)}
@@ -937,7 +946,7 @@ function renderSettings(){
   const BL={ALL:'All day (PC)',AM:'Daytime',PM:'Afternoon',EVE:'Evening'};
   return `<div class="settings">
   <div class="set-top"><h2 class="set-h">Settings</h2><div class="set-prog" role="group" aria-label="Program settings">${Object.entries(PROGRAMS).map(([k,v])=>`<button type="button" data-set-prog="${k}" aria-pressed="${k===PROG}"><span class="pm-dot ${k}">${v.name}</span>Census - ${v.name}</button>`).join('')}</div></div>
-  <p class="set-note">You're editing settings for <b>Census - ${pn}</b>. Each program keeps its own staff and schedule settings.</p>
+  <p class="set-note">You're editing settings for <b>Census - ${pn}</b>. Each program keeps its own staff and schedule settings. <span id="save-status" class="save-status ${saveState}" role="status">${saveState==='pending'?'Saving in a few seconds…':saveState==='saved'?'All changes saved':''}</span></p>
   <div class="set-scroll">
   <section class="set-card"><h3>Staff · ${pn}</h3><p class="help">These lists fill the Clinician, Case manager and Psych APN dropdowns on each client's card. Renaming someone updates every client assigned to them. Removing someone takes them off the dropdown only; clients already assigned keep the name until you reassign them.</p>
   <div class="staff-grid">${STAFF_ROLES.map(([k,plural,one])=>`<div class="staff-col"><h4>${plural} <span>${state.staff[k].length}</span></h4>
@@ -1043,6 +1052,7 @@ function renderCensus(){
 }
 /* Puts the view's HTML in place. On the Week view the search/filter bar sits between the legend and the calendar. */
 function setView(html){
+  const keepY=document.querySelector('.set-scroll')?.scrollTop||0;
   const fl=$('.filters'), vw=$('#view'), a=document.activeElement, keep=a&&fl.contains(a), ss=keep?a.selectionStart:null;
   const rb=$('#btn-reset');if(rb.parentNode!==fl)fl.appendChild(rb);
   fl.querySelectorAll('.seg.wk').forEach(x=>x.remove());
@@ -1053,6 +1063,7 @@ function setView(html){
     const seg=vw.querySelector('.wkbar .seg.wk');if(seg){seg.replaceWith(rb);fl.appendChild(seg)}}
   fl.classList.toggle('in-week',view==='schedule');
   if(keep&&document.activeElement!==a){a.focus();try{if(ss!=null)a.setSelectionRange(ss,ss)}catch(e){}}
+  {const sc=document.querySelector('.set-scroll');if(sc&&keepY)sc.scrollTop=keepY}
 }
 function renderProgram(){
   $('#prog-title').textContent=`Census - ${PROGRAMS[PROG].name}`;document.title=`Census - ${PROGRAMS[PROG].name}`;
@@ -1237,27 +1248,27 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-loc-select]')&&c){moveLoc(c.id,e.target.value);return}
   if(e.target.matches('[data-sh]')){const k=e.target.dataset.sh,i=+e.target.dataset.i,v=e.target.value,h=state.sched.hours[k];
     if(!v){render();return}const n=[...h];n[i]=v;if(n[0]>=n[1]){toast('The end time needs to be after the start time.');render();return}
-    snap();state.sched.hours[k]=n;save();render();toast(`${BLOCKS[k].n} hours set to ${blockLabel(n)}.`,true);return}
+    snap();state.sched.hours[k]=n;saveSoon();render();toast(`${BLOCKS[k].n} hours set to ${blockLabel(n)}.`,true);return}
   if(e.target.matches('[data-locon]')){const l=e.target.dataset.locon,a=state.sched.locs;
     if(!e.target.checked&&a.length<=1){toast('Keep at least one level of care turned on.');render();return}
-    snap();state.sched.locs=e.target.checked?LEVELS.filter(x=>a.includes(x)||x===l):a.filter(x=>x!==l);save();render();return}
+    snap();state.sched.locs=e.target.checked?LEVELS.filter(x=>a.includes(x)||x===l):a.filter(x=>x!==l);saveSoon();render();return}
   if(e.target.matches('[data-open]')){const d=e.target.dataset.open,a=state.sched.openDays;
     if(!e.target.checked&&a.length<=1){toast('Keep at least one day turned on.');render();return}
-    snap();state.sched.openDays=e.target.checked?DAYS.filter(x=>a.includes(x)||x===d):a.filter(x=>x!==d);save();render();return}
-  if(e.target.matches('[data-eve]')){const d=e.target.dataset.eve;snap();const a=state.sched.eveDays;state.sched.eveDays=e.target.checked?[...a,d]:a.filter(x=>x!==d);save();render();return}
-  if(e.target.matches('[data-dd]')){const l=e.target.dataset.dd,d=e.target.dataset.day;snap();const a=state.sched.days[l];state.sched.days[l]=e.target.checked?[...a,d]:a.filter(x=>x!==d);save();render();return}
+    snap();state.sched.openDays=e.target.checked?DAYS.filter(x=>a.includes(x)||x===d):a.filter(x=>x!==d);saveSoon();render();return}
+  if(e.target.matches('[data-eve]')){const d=e.target.dataset.eve;snap();const a=state.sched.eveDays;state.sched.eveDays=e.target.checked?[...a,d]:a.filter(x=>x!==d);saveSoon();render();return}
+  if(e.target.matches('[data-dd]')){const l=e.target.dataset.dd,d=e.target.dataset.day;snap();const a=state.sched.days[l];state.sched.days[l]=e.target.checked?[...a,d]:a.filter(x=>x!==d);saveSoon();render();return}
   if(e.target.matches('[data-staff-edit]')){const k=e.target.dataset.staffEdit,i=+e.target.dataset.i,old=state.staff[k][i],n=e.target.value.trim();
     if(!n||n===old){e.target.value=old;return}
     if(state.staff[k].includes(n)){toast(`${n} is already on the list.`);e.target.value=old;return}
     snap();state.staff[k][i]=n;let m=0;[...state.clients,...state.archive].forEach(c=>{if(c[k]===old){c[k]=n;m++}});
-    if(F.staff===old)F.staff=n;save();render();toast(`Renamed ${old} to ${n}${m?` on ${m} client${m>1?'s':''}`:''}.`,true);return}
+    if(F.staff===old)F.staff=n;saveSoon();render();toast(`Renamed ${old} to ${n}${m?` on ${m} client${m>1?'s':''}`:''}.`,true);return}
   if(e.target.dataset.f&&c&&e.target.closest('.drawer'))setField(c,e.target.dataset.f,e.target.value);
 });
 document.addEventListener('submit',e=>{
   const f=e.target.closest('[data-staff-add]');if(!f)return;e.preventDefault();
   const k=f.dataset.staffAdd, inp=f.querySelector('input'), n=inp.value.trim();if(!n)return;
   if(state.staff[k].includes(n)){toast(`${n} is already on the list.`);return}
-  state.staff[k].push(n);save();render();setTimeout(()=>document.querySelector(`[data-staff-add="${k}"] input`)?.focus(),0);
+  state.staff[k].push(n);saveSoon();render();setTimeout(()=>document.querySelector(`[data-staff-add="${k}"] input`)?.focus(),0);
 });
 document.addEventListener('input',e=>{
   if(e.target.matches('[data-failnote]')){const r=state.archive.find(x=>x.id===e.target.dataset.failnote);if(r){r.failNote=e.target.value;save()}return}
@@ -1416,7 +1427,7 @@ document.addEventListener('click',e=>{
   if(t.closest('[data-undo]')){if(undoSnap){state=JSON.parse(undoSnap);undoSnap=null;save();render();toast('Undone.')}return}
   if(t.id==='btn-copy'){copyCsv(t);return}
   if(t.id==='btn-import'){openImport();return}
-  const sd=t.closest('[data-staff-del]');if(sd){const k=sd.dataset.staffDel,i=+sd.dataset.i,n=state.staff[k][i];snap();state.staff[k].splice(i,1);save();render();toast(`${n} removed from the list.`,true);return}
+  const sd=t.closest('[data-staff-del]');if(sd){const k=sd.dataset.staffDel,i=+sd.dataset.i,n=state.staff[k][i];snap();state.staff[k].splice(i,1);saveSoon();render();toast(`${n} removed from the list.`,true);return}
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&$('#confirm-slot').innerHTML){closeConfirm();return}
