@@ -416,7 +416,7 @@ function archHist(kind,admit,dc,type,arch,loc){
   return h;
 }
 function sampleArchive(){
-  const A=(id,name,kind,admit,dc,type,los,note,comp,longer,arch,loc)=>({id,name,kind,admitDate:addDays(TODAY,admit),dischargedOn:dc==null?'':addDays(TODAY,dc),dcType:type,commitDays:los,commitNote:note,dcCompleted:comp,dcLonger:longer,archivedOn:addDays(TODAY,arch),locAtRemoval:loc,clinician:CLIN[(id.charCodeAt(1)||0)%4],history:archHist(kind,admit,dc,type,arch,loc)});
+  const A=(id,name,kind,admit,dc,type,los,note,comp,longer,arch,loc)=>({id,name,kind,admitDate:addDays(TODAY,admit),dischargedOn:dc==null?'':addDays(TODAY,dc),dcType:type,commitDays:los,commitNote:note,dcCompleted:comp,dcLonger:longer,archivedOn:addDays(TODAY,arch),locAtRemoval:loc,clinician:CLIN[(+id.slice(1))%4],caseManager:CM[(+id.slice(1))%3],psychApn:APN[(+id.slice(1))%2],referral:['Inpatient psych unit','Detox center','Hospital ED','Self-referral','Outpatient therapist'][(+id.slice(1))%5],history:archHist(kind,admit,dc,type,arch,loc)});
   return [
     A('a1','Morgan Ellery','discharge',-120,-41,'Completed treatment',70,'PC 3 wks, IOP 4 wks, OP 3 wks','Yes','Yes',-35,'Discharged'),
     A('a2','Dana Whitlock','discharge',-95,-52,'Left against clinical advice',56,'PC 3 wks, IOP 5 wks','No','No',-45,'Discharged'),
@@ -679,7 +679,9 @@ function openArchived(id){
       <div class="grid2">
         ${row('Admission date',fmt(r.admitDate))}${row('Discharge date',r.dischargedOn?fmt(r.dischargedOn):'')}
         ${row('Discharge type',esc(r.dcType))}${row('LOC when removed',esc(r.locAtRemoval))}
-        ${row('Incoming commitment',esc(commitText(r)))}${row('Clinician',esc(r.clinician))}
+        ${row('Incoming commitment',esc(commitText(r)))}${row('Referral source',esc(r.referral))}
+        ${row('Clinician',esc(r.clinician))}${row('Case manager',esc(r.caseManager))}
+        ${row('Psych APN',esc(r.psychApn))}<div></div>
         ${row('Completed commitment?',esc(r.dcCompleted))}${row('Longer than commitment?',esc(r.dcLonger))}
       </div>
       <div class="sec-h">History</div>
