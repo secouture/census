@@ -177,6 +177,14 @@ button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px 
 .week{overflow:visible;grid-template-columns:repeat(6,minmax(0,1fr))}
 .week.three{grid-template-columns:repeat(3,minmax(0,1fr))}
 .day{min-width:0}
+/* Week view on larger screens: the page stays put; only the area under the day headers scrolls, as one block */
+@media (min-width:761px) and (min-height:560px){
+  body.v-schedule{height:100vh;height:100dvh;overflow:hidden;padding-bottom:0;margin:0;box-sizing:border-box;padding-top:8px}
+  body.v-schedule .wrap{height:100%;display:flex;flex-direction:column}
+  body.v-schedule #view{flex:1;min-height:0;display:flex;flex-direction:column}
+  body.v-schedule .week{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:16px;align-content:start;grid-auto-rows:max-content}
+  body.v-schedule .day>*{flex-shrink:0}
+}
 @media (max-width:1100px) and (min-width:761px){.week:not(.three){grid-template-columns:repeat(3,minmax(0,1fr))}}
 .day-h{position:sticky;top:0;z-index:3;background:var(--sunk);margin:-10px -10px 0;padding:10px 12px 8px;border-radius:10px 10px 0 0}
 .day.over .day-h{background:color-mix(in srgb,var(--accent) 10%,var(--sunk))}
@@ -820,6 +828,7 @@ function render(){
   $('#today').textContent=`${pISO(TODAY).toLocaleDateString('en-US',{weekday:'long'})} ${fmt(TODAY)}`;
   document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.view===view?'page':'false'));
   document.body.classList.toggle('v-settings',view==='settings');
+  document.body.classList.toggle('v-schedule',view==='schedule');
   renderStats();renderStaffFilter();
   $('#view').innerHTML=view==='schedule'?renderSchedule():view==='archive'?renderArchive():view==='settings'?renderSettings():renderCensus();
   if(openId)renderDrawer();
