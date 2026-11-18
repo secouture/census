@@ -784,8 +784,7 @@ function renderAudit(){
     <h2>Audit log · Census - ${PROGRAMS[PROG].name}<button type="button" class="x" data-close aria-label="Close">×</button></h2>
     <p class="help">Read-only. Newest first. ${all.length} entries in total.</p>
     <div class="aud-bar"><input type="search" id="aud-q" placeholder="Search client, person or detail…" value="${esc(audF.q)}">
-      <select id="aud-act"><option value="">All actions</option>${AUD_ACTS.map(a=>`<option ${audF.act===a?'selected':''}>${a}</option>`).join('')}</select>
-      <button class="btn small" type="button" data-audit-csv>Download CSV</button></div>
+      <select id="aud-act"><option value="">All actions</option>${AUD_ACTS.map(a=>`<option ${audF.act===a?'selected':''}>${a}</option>`).join('')}</select></div>
     <div class="tablewrap scroll aud-wrap"><table class="census aud"><thead><tr><th>Date / time</th><th>User</th><th>Action</th><th>Client</th><th>Details</th></tr></thead>
     <tbody>${rows.slice(0,audF.n).map(e=>`<tr><td>${audTime(e.ts)}</td><td>${esc(e.user)}</td><td><span class="aud-act ${e.act.toLowerCase()}">${e.act}</span></td><td>${esc(e.client||'—')}</td><td class="aud-d">${esc(audDetail(e))}</td></tr>`).join('')||`<tr><td colspan="5" class="of">No entries${all.length?' match':' yet'}.</td></tr>`}</tbody></table></div>
     ${rows.length>audF.n?`<button class="btn small" type="button" data-audit-more>Show more (${rows.length-audF.n} older)</button>`:''}
