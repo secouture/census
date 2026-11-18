@@ -149,6 +149,7 @@ td .lvl{font-weight:700;color:var(--c)}
 
 /* Census rows */
 table.census td{vertical-align:middle}
+table.arch tbody tr{cursor:default}
 .tablewrap.scroll{max-height:max(360px,calc(100vh - 140px));overflow:auto;overscroll-behavior:contain}
 table.census thead th{position:sticky;top:0;z-index:2;box-shadow:inset 0 -1px 0 var(--line)}
 table.census th:first-child,table.census td:first-child{position:sticky;left:0;z-index:1;background:var(--surface)}
@@ -273,6 +274,7 @@ table.census tr.dc td{color:var(--muted)}
     <nav class="tabs" aria-label="Views">
       <a href="#census" data-view="census">Census</a>
       <a href="#schedule" data-view="schedule">Week</a>
+      <a href="#archive" data-view="archive">Archive</a>
     </nav>
     <div class="actions">
       <button class="btn" id="btn-import">Import spreadsheet</button>
@@ -314,7 +316,7 @@ const M6=['mon','tue','wed','thu','fri','sat'],M5=['mon','tue','wed','thu','fri'
 const DEFAULT_DAYS={Pending:[],PC6:M6,PC5:M5,IOP6:M6,IOP5:M5,IOP4:['mon','tue','wed','thu'],IOP3:['mon','tue','thu'],EIOP:['mon','tue','thu'],OP:['tue'],Discharged:[]};
 const DEFAULT_LOS={PHP:21,IOP:28};
 const OP_TO_DC=42;
-const KEY='census-prototype-v6';
+const KEY='census-prototype-v7';
 /* Sample discharge types until the program's real list is provided. */
 const DC_TYPES=['Completed treatment','Stepped down to outside provider','Transferred to higher level of care','Left against clinical advice','Administrative discharge','Lost contact / non-attendance','Insurance / financial'];
 const dcMissing=c=>c.dischargedOn&&(!c.dcType||!c.dcCompleted||!c.dcLonger);
@@ -412,9 +414,21 @@ function sample(){
   }}).map(c=>{const b=SB[c.name];c.blocks=normBlocks(c.loc,c.days,typeof b==='string'?uniform(c.days,b):b||{});return c});
 }
 
+/* Fictional archived records: discharges and incomplete (failed) admissions. */
+function sampleArchive(){
+  const A=(id,name,kind,admit,dc,type,los,note,comp,longer,arch,loc)=>({id,name,kind,admitDate:addDays(TODAY,admit),dischargedOn:dc==null?'':addDays(TODAY,dc),dcType:type,commitDays:los,commitNote:note,dcCompleted:comp,dcLonger:longer,archivedOn:addDays(TODAY,arch),locAtRemoval:loc,clinician:CLIN[(id.charCodeAt(1)||0)%4],history:[]});
+  return [
+    A('a1','Morgan Ellery','discharge',-120,-41,'Completed treatment',70,'PC 3 wks, IOP 4 wks, OP 3 wks','Yes','Yes',-35,'Discharged'),
+    A('a2','Dana Whitlock','discharge',-95,-52,'Left against clinical advice',56,'PC 3 wks, IOP 5 wks','No','No',-45,'Discharged'),
+    A('a3','Jules Barrington','discharge',-88,-33,'Stepped down to outside provider',56,'IOP 8 wks','Yes','No',-30,'Discharged'),
+    A('a4','Kai Nakamura','incomplete',-21,null,'',56,'PC 3 wks, then IOP','','',-18,'Pending'),
+    A('a5','Reese Calloway','incomplete',-9,null,'',42,'IOP 6 wks','','',-6,'Pending'),
+  ];
+}
+
 /* ---------- state ---------- */
 let state=load();
-function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients))return s}catch(e){}return{clients:sample(),seq:100}}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients)){s.archive=s.archive||[];return s}}catch(e){}return{clients:sample(),archive:sampleArchive(),seq:100}}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 const byId=id=>state.clients.find(c=>c.id===id);
 let undoSnap=null;
@@ -616,8 +630,40 @@ function render(){
   $('#today').textContent=`${pISO(TODAY).toLocaleDateString('en-US',{weekday:'long'})} ${fmt(TODAY)}`;
   document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.view===view?'page':'false'));
   renderStats();renderStaffFilter();
-  $('#view').innerHTML=view==='schedule'?renderSchedule():renderCensus();
+  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='archive'?renderArchive():renderCensus();
   if(openId)renderDrawer();
+}
+
+/* ---------- archive ---------- */
+/* Pending with no discharge date = incomplete/failed admission. Anyone with a discharge date = discharge. */
+function archiveKind(c){if(c.dischargedOn)return 'discharge';if(c.loc==='Pending')return 'incomplete';return null}
+let archKind='discharge';
+const ARCH_COLS=[['name','Client'],['admitDate','Admission date'],['dischargedOn','Discharge date'],['dcType','Discharge type'],['commit','Incoming commitment'],['dcCompleted','Completed commitment?'],['dcLonger','Longer than commitment?'],['archivedOn','Archived']];
+function archRows(){
+  const q=F.q.toLowerCase();
+  return state.archive.filter(r=>r.kind===archKind&&(!q||[r.name,r.dcType,r.commitNote].join(' ').toLowerCase().includes(q)))
+    .sort((a,b)=>(b.archivedOn||'').localeCompare(a.archivedOn||''));
+}
+const commitText=r=>[r.commitDays?`${r.commitDays} days`:'',r.commitNote||''].filter(Boolean).join(' · ');
+function renderArchive(){
+  const n=k=>state.archive.filter(r=>r.kind===k).length, rows=archRows();
+  const cell=(r,k)=>k==='commit'?esc(commitText(r))||'—':['admitDate','dischargedOn','archivedOn'].includes(k)?`<span class="mono">${fmt(r[k])}</span>`:esc(r[k])||'—';
+  return `<div class="tbar"><div class="locfilter" role="group" aria-label="Archive list">
+      <button data-arch-kind="discharge" aria-pressed="${archKind==='discharge'}" style="--c:var(--dc)">Discharges <span>${n('discharge')}</span></button>
+      <button data-arch-kind="incomplete" aria-pressed="${archKind==='incomplete'}" style="--c:var(--pend)">Incomplete admissions <span>${n('incomplete')}</span></button></div>
+    <p>${archKind==='incomplete'?'Clients removed while still Pending with no discharge date.':'Clients removed from the census after discharge.'} Restore puts a client back on the census.</p>
+    <button class="btn small" id="btn-copy-arch">Copy this list (CSV)</button></div>
+  <div class="tablewrap scroll"><table class="census arch"><thead><tr>${ARCH_COLS.map(([,l])=>`<th>${l}</th>`).join('')}<th></th></tr></thead>
+  <tbody>${rows.map(r=>`<tr style="--c:var(${r.kind==='incomplete'?'--pend':'--dc'})">${ARCH_COLS.map(([k])=>`<td>${cell(r,k)}</td>`).join('')}<td><button class="btn small" data-restore="${r.id}">Restore</button></td></tr>`).join('')||`<tr><td colspan="${ARCH_COLS.length+1}" class="of">Nothing archived here yet.</td></tr>`}</tbody></table></div>`;
+}
+function archCsv(){
+  const q=v=>{v=String(v??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
+  const head=['Client name','Admission date','Discharge date','Discharge type','Incoming commitment','Commitment days','Completed commitment?','Longer than commitment?','Archived on','List'];
+  return [head,...archRows().map(r=>[r.name,fmt(r.admitDate).replace('—',''),r.dischargedOn?fmt(r.dischargedOn):'',r.dcType,r.commitNote,r.commitDays||'',r.dcCompleted,r.dcLonger,fmt(r.archivedOn),r.kind==='incomplete'?'Incomplete admission':'Discharge'])].map(r=>r.map(q).join(',')).join('\n');
+}
+function copyText(text,btn,label){
+  const done=()=>{btn.textContent='Copied. Paste into Excel';setTimeout(()=>btn.textContent=label,2500)};
+  try{navigator.clipboard.writeText(text).then(done,()=>fallbackCopy(text))}catch(_){fallbackCopy(text)}
 }
 
 /* ---------- drawer ---------- */
@@ -667,7 +713,7 @@ function renderDrawer(){
       </div>
       <div class="sec-h">History</div>
       <ul class="hist">${[...c.history].reverse().map(h=>`<li><span class="mono">${fmt(h.date)}</span><span>${esc(h.text)}</span></li>`).join('')}</ul>
-      <div class="confirm">${confirmDel?`Remove ${esc(c.name)} from the census? <button class="btn small danger" data-del-yes>Remove</button><button class="btn small" data-del-no>Cancel</button>`:`<button class="btn small danger" data-del>Remove from census</button>`}</div>
+      <div class="confirm">${confirmDel?(archiveKind(c)?`Archive ${esc(c.name)} under ${archiveKind(c)==='incomplete'?'<b>Incomplete admissions</b>':'<b>Discharges</b>'} and remove them from the census? <button class="btn small danger" data-del-yes>Archive</button><button class="btn small" data-del-no>Cancel</button>`:`<span class="err">Enter a date of discharge before removing ${esc(c.name)} from the census.</span><button class="btn small" data-del-no>OK</button>`):`<button class="btn small danger" data-del>Remove from census</button>`}</div>
     </div>
   </aside>`;
   $('.drawer-b').scrollTop=scroll;
@@ -686,7 +732,7 @@ function setField(c,f,v){
   save();
   const keepFocus=document.activeElement?.id;
   renderStats();renderStaffFilter();
-  $('#view').innerHTML=view==='schedule'?renderSchedule():renderCensus();
+  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='archive'?renderArchive():renderCensus();
   if(f!=='name'&&f!=='referral'&&f!=='commitNote'){renderDrawer();if(keepFocus)document.getElementById(keepFocus)?.focus()}
   else $('.drawer-h h2').textContent=c.name;
 }
@@ -823,7 +869,16 @@ document.addEventListener('click',e=>{
   if(t.closest('[data-house]')&&c){c.housing=t.closest('[data-house]').dataset.house;save();render();return}
   if(t.closest('[data-del]')){confirmDel=true;renderDrawer();return}
   if(t.closest('[data-del-no]')){confirmDel=false;renderDrawer();return}
-  if(t.closest('[data-del-yes]')&&c){snap();const name=c.name;state.clients=state.clients.filter(x=>x.id!==c.id);save();closeLayer();render();toast(`${name} removed.`,true);return}
+  if(t.closest('[data-del-yes]')&&c){const kind=archiveKind(c);if(!kind)return;snap();
+    state.archive.unshift({...JSON.parse(JSON.stringify(c)),kind,archivedOn:TODAY,locAtRemoval:c.loc});
+    state.clients=state.clients.filter(x=>x.id!==c.id);save();closeLayer();render();
+    toast(`${c.name} archived under ${kind==='incomplete'?'Incomplete admissions':'Discharges'}.`,true);return}
+  const ab=t.closest('[data-arch-kind]');if(ab){archKind=ab.dataset.archKind;render();return}
+  const rs=t.closest('[data-restore]');if(rs){const r=state.archive.find(x=>x.id===rs.dataset.restore);if(!r)return;snap();
+    const {kind,archivedOn,locAtRemoval,...cl}=r;cl.loc=locAtRemoval||(cl.dischargedOn?'Discharged':'Pending');cl.days=cl.days||[];cl.blocks=cl.blocks||{};cl.plans=cl.plans||[];cl.history=[...(cl.history||[]),{date:TODAY,text:'Restored from archive'}];
+    cl.caseManager=cl.caseManager||CM[0];cl.psychApn=cl.psychApn||APN[0];cl.referral=cl.referral||'';cl.housing=cl.housing||'Commuter';cl.dcDate=cl.dcDate||'';
+    state.archive=state.archive.filter(x=>x.id!==r.id);state.clients.push(cl);save();render();toast(`${r.name} restored to the census.`,true);return}
+  if(t.id==='btn-copy-arch'){copyText(archCsv(),t,'Copy this list (CSV)');return}
   if(t.closest('[data-undo]')){if(undoSnap){state=JSON.parse(undoSnap);undoSnap=null;save();render();toast('Undone.')}return}
   if(t.id==='btn-copy'){copyCsv(t);return}
 });
@@ -840,7 +895,7 @@ $('#btn-add').addEventListener('click',()=>{
 let resetArmed=false;
 $('#btn-reset').addEventListener('click',e=>{
   if(!resetArmed){resetArmed=true;e.target.textContent='Click again to reset';setTimeout(()=>{resetArmed=false;e.target.textContent='Reset sample data'},3000);return}
-  resetArmed=false;e.target.textContent='Reset sample data';snap();state={clients:sample(),seq:100};save();closeLayer();render();toast('Sample data restored.',true);
+  resetArmed=false;e.target.textContent='Reset sample data';snap();state={clients:sample(),archive:sampleArchive(),seq:100};save();closeLayer();render();toast('Sample data restored.',true);
 });
 
 /* ---------- toast ---------- */
@@ -1060,7 +1115,7 @@ Sample Person C,${fmt2(3)},,,Pending,,,J. Lindqvist LMFT,S. Haddad,L. Moreau PMH
 function fmt2(n){const d=pISO(addDays(TODAY,n));return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`}
 
 /* ---------- routing ---------- */
-function route(){const h=location.hash.slice(1);view=h==='schedule'?'schedule':'census';render()}
+function route(){const h=location.hash.slice(1);view=['schedule','archive'].includes(h)?h:'census';render()}
 addEventListener('hashchange',route);
 const bootDone=runScheduled();
 route();
