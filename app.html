@@ -173,6 +173,10 @@ button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px 
 .day.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--sunk))}
 .day.today{border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
 .day-h{padding:0 2px 6px;border-bottom:1px solid var(--line)}
+/* Frozen day headers: lists scroll under them */
+.week{max-height:max(380px,calc(100vh - 150px));overflow:auto;overscroll-behavior:contain}
+.day-h{position:sticky;top:0;z-index:3;background:var(--sunk);margin:-10px -10px 0;padding:10px 12px 8px;border-radius:10px 10px 0 0}
+.day.over .day-h{background:color-mix(in srgb,var(--accent) 10%,var(--sunk))}
 .day-h .dn{font-family:var(--f-display);font-weight:800;font-size:16px}
 .day-h .dd{color:var(--muted);font-size:12px;margin-left:6px}
 .day-h .cnt{font-size:12px;color:var(--muted);margin-top:2px}
@@ -356,7 +360,7 @@ table.arch td{white-space:normal}
 
 @media (max-width:760px){
   .board{grid-template-columns:1fr;overflow:visible}
-  .week{grid-template-columns:1fr 1fr;overflow:visible}
+  .week{grid-template-columns:1fr 1fr;overflow:visible;max-height:none}
   .week.three{grid-template-columns:1fr}
   .brand h1{font-size:21px}
   .filters input{max-width:none}
