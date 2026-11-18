@@ -342,18 +342,21 @@ function calcDc(admit,los){
 const BLOCKS={ALL:{n:'All day',t:'9–3:30'},AM:{n:'Daytime',t:'9–12'},PM:{n:'Afternoon',t:'12:30–3:30'},EVE:{n:'Evening',t:'6–9pm'}};
 const BLOCK_ORDER=['ALL','AM','PM','EVE'];
 const allowedBlocks=loc=>/^PC/.test(loc)?['ALL']:['AM','PM','EVE'];
-const defaultBlock=loc=>/^PC/.test(loc)?'ALL':loc==='EIOP'?'EVE':'AM';
+/* The evening program (6–9pm) only runs Mon, Tue and Thu nights. */
+const EVE_DAYS=['mon','tue','thu'];
+const blocksFor=(loc,d)=>allowedBlocks(loc).filter(b=>b!=='EVE'||EVE_DAYS.includes(d));
+const defaultBlock=(loc,d)=>{const b=/^PC/.test(loc)?'ALL':loc==='EIOP'?'EVE':'AM';return d&&b==='EVE'&&!EVE_DAYS.includes(d)?'AM':b};
 const EXPECT={PC6:6,PC5:5,IOP6:6,IOP5:5,IOP4:4,IOP3:3,EIOP:3};
 const CUSTOM_DAYS=['IOP4','IOP3','OP'];
 const sortDays=d=>[...new Set(d)].sort((a,b)=>DAYS.indexOf(a)-DAYS.indexOf(b));
-function normBlocks(loc,days,blocks){const al=allowedBlocks(loc),o={};days.forEach(d=>{o[d]=al.includes(blocks&&blocks[d])?blocks[d]:defaultBlock(loc)});return o}
+function normBlocks(loc,days,blocks){const o={};days.forEach(d=>{o[d]=blocksFor(loc,d).includes(blocks&&blocks[d])?blocks[d]:defaultBlock(loc,d)});return o}
 const uniform=(days,b)=>Object.fromEntries(days.map(d=>[d,b]));
-const blk=(c,d)=>((c.blocks||{})[d])||defaultBlock(c.loc);
+const blk=(c,d)=>((c.blocks||{})[d])||defaultBlock(c.loc,d);
 function setSched(c,days,blocks){c.days=sortDays(days);c.blocks=normBlocks(c.loc,c.days,blocks)}
 function schedHTML(x){return schedSummary(x).split('; ').filter(Boolean).map(g=>`<span class="sg">${esc(g)}</span>`).join('')}
 function schedSummary(x){
   if(!x.days||!x.days.length)return '';
-  const groups={};x.days.forEach(d=>{const b=(x.blocks||{})[d]||defaultBlock(x.loc);(groups[b]=groups[b]||[]).push(DAY_SHORT[d])});
+  const groups={};x.days.forEach(d=>{const b=(x.blocks||{})[d]||defaultBlock(x.loc,d);(groups[b]=groups[b]||[]).push(DAY_SHORT[d])});
   return BLOCK_ORDER.filter(b=>groups[b]).map(b=>`${groups[b].join(' ')} · ${BLOCKS[b].t}`).join('; ');
 }
 const NEXT_LOC={Pending:'PC5',PC6:'IOP5',PC5:'IOP5',IOP6:'IOP3',IOP5:'IOP3',IOP4:'IOP3',IOP3:'OP',EIOP:'OP',OP:'Discharged'};
@@ -517,6 +520,7 @@ function moveSlot(id,fromDay,toDay,toBlock){
   const c=byId(id);if(!c)return;
   const al=allowedBlocks(c.loc), fromB=blk(c,fromDay);
   if(!al.includes(toBlock)){toast(`${c.loc} meets ${al.map(b=>`${BLOCKS[b].n.toLowerCase()} (${BLOCKS[b].t})`).join(', ')} only.`);return}
+  if(toBlock==='EVE'&&!EVE_DAYS.includes(toDay)){toast('Evening groups only run Mon, Tue and Thu nights.');return}
   if(fromDay===toDay&&fromB===toBlock)return;
   if(fromDay!==toDay&&c.days.includes(toDay)){toast(`${c.name} is already scheduled on ${DAY_LABEL[toDay]}.`);return}
   snap();
@@ -588,7 +592,7 @@ function renderAttention(list){
 function weekDates(){const d=pISO(TODAY);const dow=(d.getDay()+6)%7;const mon=addDays(TODAY,-dow);return DAYS.map((k,i)=>({k,date:addDays(mon,i)}))}
 function renderSchedule(){
   const list=state.clients.filter(c=>LEVELS.includes(c.loc)&&visible(c));
-  const legend=`<div class="legend">${GROUPS.map(g=>`<span><span class="swatch" style="background:var(${GROUP_VAR[g]})"></span>${g}</span>`).join('')}<span>Drag a name to another day or time block to change that client's schedule. PC is all day only. Click a name for details.</span></div>`;
+  const legend=`<div class="legend">${GROUPS.map(g=>`<span><span class="swatch" style="background:var(${GROUP_VAR[g]})"></span>${g}</span>`).join('')}<span>Drag a name to another day or time block to change that client's schedule. PC is all day only, and evening groups run Mon, Tue and Thu only. Click a name for details.</span></div>`;
   const cols=weekDates().map(({k,date})=>{
     const cs=list.filter(c=>c.days.includes(k)).sort((a,b)=>RANK[a.loc]-RANK[b.loc]||a.name.localeCompare(b.name));
     const by=g=>cs.filter(c=>group(c.loc)===g).length, lpd=cs.filter(c=>c.housing==='LPD').length;
@@ -597,7 +601,7 @@ function renderSchedule(){
       <div class="day-h"><span class="dn">${DAY_LABEL[k]}</span><span class="dd">${fmt(date)}${date===TODAY?' · today':''}</span>
         <div class="cnt"><b>${cs.length}</b> expected · ${GROUPS.map(g=>`${g} ${by(g)}`).join(' · ')} · LPD ${lpd}</div>
         <div class="mix">${mix}</div></div>
-      ${BLOCK_ORDER.map(b=>{const ss=cs.filter(c=>blk(c,k)===b);return `<div class="ses" data-drop="day" data-day="${k}" data-block="${b}"><div class="ses-h">${BLOCKS[b].n} <span class="t">${BLOCKS[b].t}</span><span class="n">${ss.length}</span></div>
+      ${BLOCK_ORDER.filter(b=>b!=='EVE'||EVE_DAYS.includes(k)).map(b=>{const ss=cs.filter(c=>blk(c,k)===b);return `<div class="ses" data-drop="day" data-day="${k}" data-block="${b}"><div class="ses-h">${BLOCKS[b].n} <span class="t">${BLOCKS[b].t}</span><span class="n">${ss.length}</span></div>
         ${ss.map(c=>`<button class="chip" style="--c:${cvar(c.loc)}" data-drag="sched" data-id="${c.id}" data-day="${k}"><span class="dot"></span>${esc(c.name)}${c.housing==='LPD'?'<span class="h">LPD</span>':''}<span class="lv">${c.loc}</span></button>`).join('')}</div>`}).join('')}
     </section>`;
   }).join('');
@@ -823,11 +827,11 @@ $('#f-house').addEventListener('change',e=>{F.house=e.target.value;render()});
 /* ---------- day/time picker ---------- */
 function pickerHTML(ctx,x){
   const al=allowedBlocks(x.loc), exp=EXPECT[x.loc], n=x.days.length;
-  const note=/^PC/.test(x.loc)?'PC meets all day, 9–3:30.':x.loc==='EIOP'?'EIOP usually meets Mon, Tue and Thu evenings, 6–9pm. Daytime and afternoon IOP groups are available too.':CUSTOM_DAYS.includes(x.loc)?`${x.loc} days vary. Pick the days and a time block for each.`:'Pick a time block for each day.';
+  const note=/^PC/.test(x.loc)?'PC meets all day, 9–3:30.':x.loc==='EIOP'?'EIOP meets Mon, Tue and Thu evenings, 6–9pm. Daytime and afternoon IOP groups are available too.':CUSTOM_DAYS.includes(x.loc)?`${x.loc} days vary. Pick the days and a time block for each. Evening groups run Mon, Tue and Thu only.`:'Pick a time block for each day. Evening groups run Mon, Tue and Thu only.';
   return `<div class="fld"><span class="lbl">Days and times · ${n}x/wk${exp&&n!==exp?` <span class="warnt">${x.loc} is ${exp} days</span>`:''}</span>
     <p class="hint">${note}</p>
-    <div class="bgrid" style="--c:${cvar(x.loc)}">${DAYS.map(d=>{const on=x.days.includes(d),b=on?((x.blocks||{})[d]||defaultBlock(x.loc)):'OFF';
-      return `<div class="brow"><span class="bday">${DAY_LABEL[d]}</span><div class="bopts">${['OFF',...al].map(o=>`<button type="button" data-ctx="${ctx}" data-sd="${d}" data-sb="${o}" aria-pressed="${b===o}" class="${o==='OFF'?'off':''}">${o==='OFF'?'Off':`${BLOCKS[o].n}<small>${BLOCKS[o].t}</small>`}</button>`).join('')}</div></div>`}).join('')}</div></div>`;
+    <div class="bgrid" style="--c:${cvar(x.loc)}">${DAYS.map(d=>{const on=x.days.includes(d),b=on?((x.blocks||{})[d]||defaultBlock(x.loc,d)):'OFF';
+      return `<div class="brow"><span class="bday">${DAY_LABEL[d]}</span><div class="bopts">${['OFF',...blocksFor(x.loc,d)].map(o=>`<button type="button" data-ctx="${ctx}" data-sd="${d}" data-sb="${o}" aria-pressed="${b===o}" class="${o==='OFF'?'off':''}">${o==='OFF'?'Off':`${BLOCKS[o].n}<small>${BLOCKS[o].t}</small>`}</button>`).join('')}</div></div>`}).join('')}</div></div>`;
 }
 function pickerSet(x,d,o){
   const days=x.days.filter(k=>k!==d), blocks={...(x.blocks||{})};delete blocks[d];
