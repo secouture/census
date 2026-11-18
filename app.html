@@ -69,6 +69,9 @@ body.v-settings #stats,body.v-settings .filters{display:none}
 .stat .split>div+div{padding-left:18px;border-left:1px solid var(--line)}
 .stat .pills{margin-top:4px}
 .stat .pill{font-size:12px;padding:2px 7px}
+a.stat.link{text-decoration:none;color:inherit;cursor:pointer}
+a.stat.link:hover{border-color:var(--accent)}
+a.stat.link u{color:var(--accent);text-decoration:none;font-weight:600}
 button.stat{font:inherit;color:inherit;text-align:left;cursor:pointer}
 button.stat:hover{border-color:var(--muted)}
 button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 15%,transparent)}
@@ -672,7 +675,7 @@ function renderStats(){
     `<div class="stat wide"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${GROUPS.map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
     `<div class="stat"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${admToday}</div><div class="s">admits today</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DCs today</div></div></div></div>`+
     `<div class="stat"><div class="k">Housing</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
-    st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
+    `<a href="#schedule" class="stat link" data-goto-today title="Open today in the 3-day week view"><div class="k">Expected today</div><div class="v">${tk==='sun'?'—':todayCount}</div><div class="s">${tk==='sun'?'no groups Sunday · ':'scheduled · '}<u>see schedule →</u></div></a>`+
     '';
   const wk=weekEvents(), wkLeft=wk.days.reduce((n,d)=>n+(d.date>=TODAY?d.ev.length:0),0);
   $('#bell-slot').innerHTML=`<button type="button" class="attn-btn ${attn?'on':''}" data-pop="attn" aria-expanded="${pop==='attn'}" title="Needs attention" aria-label="Needs attention: ${attn}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg><b>${attn}</b></button>`;
@@ -1094,6 +1097,9 @@ document.addEventListener('click',e=>{
   if(suppressClick){suppressClick=false;e.preventDefault();return}
   const t=e.target;
   if(t.closest('select'))return;
+  const gt=t.closest('[data-goto-today]');if(gt){e.preventDefault();weekMode='3';weekShift=0;try{localStorage.setItem('census-weekmode','3')}catch(e){}
+    if(location.hash!=='#schedule')location.hash='#schedule';else render();
+    setTimeout(()=>{const d=document.querySelector('.day.today')||document.querySelector('.week .day');if(d)window.scrollTo({top:Math.max(0,d.getBoundingClientRect().top+scrollY-90),behavior:'smooth'})},60);return}
   const pb=t.closest('[data-pop]');if(pb){pop=pop===pb.dataset.pop?null:pb.dataset.pop;renderStats();return}
   if(pop&&(!t.closest('#attn-pop')||t.closest('#attn-pop [data-open]'))){pop=null;renderStats()}
   const c=byId(openId);
