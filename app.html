@@ -96,13 +96,13 @@ button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px 
 .wkov .wd{color:var(--muted);font-size:12px;margin-left:auto;text-align:right}
 .attn-pop.wkov .empty{padding:0 8px 4px;font-size:12px}
 @media (max-width:560px){.wk-btn .lbl{display:none}.wkov .ev{min-width:0}}
-.attn-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:9px;padding:6px 10px;font:inherit;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
+.attn-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:9px;padding:6px 10px;font:inherit;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
 .attn-btn b{min-width:20px;padding:0 6px;border-radius:999px;background:var(--sunk);color:var(--muted);font-size:12px;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
 .attn-btn.on{border-color:color-mix(in srgb,var(--crit) 45%,var(--line));color:var(--crit);background:color-mix(in srgb,var(--crit) 7%,var(--surface))}
 .attn-btn.on b{background:var(--crit);color:#fff}
 .attn-btn:hover{border-color:var(--crit)}
 .attn-btn[aria-expanded="true"]{box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 18%,transparent)}
-@media (max-width:560px){.attn-btn .lbl{display:none}}
+@media (max-width:560px){.attn-btn .lbl{display:none}.tabs a{padding:6px 7px}.navgrp{gap:5px}.attn-btn{padding:6px 7px}.wk-btn{padding:7px 8px}}
 .attn-scrim{position:fixed;inset:0;z-index:39;background:rgba(15,20,25,.28)}
 .attn-pop{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:40;width:min(480px,calc(100vw - 32px));max-height:min(70vh,560px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px}
 .attn-pop h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:6px 8px 6px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
@@ -372,7 +372,7 @@ table.arch td{white-space:normal}
       <a href="#schedule" data-view="schedule">Week</a>
       <a href="#archive" data-view="archive">Archive</a>
       <a href="#settings" data-view="settings" class="gear" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.5a.5.5 0 0 0-.6-.2l-2.5 1a7.3 7.3 0 0 0-1.7-1L14.4 2.4a.5.5 0 0 0-.5-.4h-4a.5.5 0 0 0-.5.4L9 5.1a7.3 7.3 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.5a.5.5 0 0 0 .1.6L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.5c.1.2.4.3.6.2l2.5-1c.5.4 1.1.7 1.7 1l.4 2.7c0 .2.2.4.5.4h4c.2 0 .5-.2.5-.4l.4-2.7c.6-.3 1.2-.6 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.5a.5.5 0 0 0-.1-.6ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></a>
-    </nav></div>
+    </nav><div id="bell-slot"></div></div>
     <div class="actions">
       <button class="btn primary" id="btn-add">Add client</button>
     </div>
@@ -675,7 +675,8 @@ function renderStats(){
     st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
     '';
   const wk=weekEvents(), wkLeft=wk.days.reduce((n,d)=>n+(d.date>=TODAY?d.ev.length:0),0);
-  $('#attn-slot').innerHTML=`<button type="button" class="wk-btn" data-pop="week" aria-expanded="${pop==='week'}" title="Admissions, LOC changes and discharges this week"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2Zm-2 8h14v10H5Z" fill="currentColor"/></svg><span class="lbl">Week overview</span><b>${wkLeft}</b></button><button type="button" class="attn-btn ${attn?'on':''}" data-pop="attn" aria-expanded="${pop==='attn'}" title="Needs attention"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg><span class="lbl">Needs attention</span><b>${attn}</b></button>`+
+  $('#bell-slot').innerHTML=`<button type="button" class="attn-btn ${attn?'on':''}" data-pop="attn" aria-expanded="${pop==='attn'}" title="Needs attention" aria-label="Needs attention: ${attn}"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg><b>${attn}</b></button>`;
+  $('#attn-slot').innerHTML=`<button type="button" class="wk-btn" data-pop="week" aria-expanded="${pop==='week'}" title="Admissions, LOC changes and discharges this week"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2Zm-2 8h14v10H5Z" fill="currentColor"/></svg><span class="lbl">Week overview</span><b>${wkLeft}</b></button>`+
     (pop?'<div class="attn-scrim"></div>'+(pop==='attn'?renderAttention(state.clients):renderWeekOverview(wk)):'');
 }
 function renderStaffFilter(){
