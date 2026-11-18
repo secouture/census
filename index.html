@@ -444,8 +444,8 @@ const DAY_LABEL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat'};
 const DAY_SHORT={mon:'M',tue:'Tu',wed:'W',thu:'Th',fri:'F',sat:'Sa'};
 /* LOC carries the frequency: PC6 = partial care 6 days/wk, IOP4 = IOP 4 days/wk, EIOP = evening IOP. */
 const LEVELS=['PC6','PC5','IOP6','IOP5','IOP4','IOP3','EIOP','OP'];
-const LOCS=['Pending',...LEVELS,'Discharged'];
-/* Discharged is a status set by the date of discharge, not a choosable LOC. */
+const LOCS=['Pending',...LEVELS];
+/* Discharge is a status set by the date of discharge, never a LOC: a discharged client keeps the LOC they left from. */
 const PICK_LOCS=['Pending',...LEVELS];
 const LOC_NAME=Object.fromEntries(LOCS.map(l=>[l,l]));
 const GROUPS=['PC','IOP','EIOP','OP'];
@@ -490,13 +490,15 @@ function schedSummary(x){
   const groups={};x.days.forEach(d=>{const b=(x.blocks||{})[d]||defaultBlock(x.loc,d);(groups[b]=groups[b]||[]).push(DAY_SHORT[d])});
   return BLOCK_ORDER.filter(b=>groups[b]).map(b=>`${groups[b].join(' ')} · ${BLOCKS[b].t}`).join('; ');
 }
-const NEXT_LOC={Pending:'PC5',PC6:'IOP5',PC5:'IOP5',IOP6:'IOP3',IOP5:'IOP3',IOP4:'IOP3',IOP3:'OP',EIOP:'OP',OP:'Discharged'};
+const NEXT_LOC={Pending:'PC5',PC6:'IOP5',PC5:'IOP5',IOP6:'IOP3',IOP5:'IOP3',IOP4:'IOP3',IOP3:'OP',EIOP:'OP',OP:null};
 
 /* ---------- dates ---------- */
 const pad=n=>String(n).padStart(2,'0');
 const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const pISO=s=>{if(!s)return null;const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
 let TODAY=iso(new Date());
+const isDC=c=>!!c.dischargedOn&&c.dischargedOn<=TODAY;   // discharged (date of discharge reached)
+const isActive=c=>LEVELS.includes(c.loc)&&!isDC(c);     // in the program now
 const addDays=(s,n)=>{const d=pISO(s);d.setDate(d.getDate()+n);return iso(d)};
 const diff=(a,b)=>Math.round((pISO(b)-pISO(a))/864e5);
 const fmt=s=>{if(!s)return '—';const d=pISO(s);return `${pad(d.getMonth()+1)}/${pad(d.getDate())}/${String(d.getFullYear()).slice(-2)}`};
@@ -535,9 +537,9 @@ function sample(){
     ['Oliver Grant','OP',-71,null,-2,'thu',3,0,1,'Inpatient psych unit',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
     ['Simone Achebe','OP',-83,null,0,'tue',0,1,0,'EAP',84,'PC 4 wks, IOP 4 wks, OP 4 wks','Commuter'],
     ['Ben Okonkwo','OP',-64,null,13,'wed',1,2,1,'Family',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
-    ['Riley Starr','Discharged',-60,null,-3,'',2,0,0,'Hospital ED',56,'PC 3 wks, IOP 5 wks','Commuter',-3],
-    ['Frances Iwu','Discharged',-75,null,-8,'',3,1,1,'Detox center',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD',-8],
-    ['Quinn Albright','Discharged',-40,null,-14,'',0,2,0,'Self-referral',42,'IOP 6 wks','Commuter',-14],
+    ['Riley Starr','IOP3',-60,null,-3,'',2,0,0,'Hospital ED',56,'PC 3 wks, IOP 5 wks','Commuter',-3],
+    ['Frances Iwu','OP',-75,null,-8,'',3,1,1,'Detox center',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD',-8],
+    ['Quinn Albright','IOP4',-40,null,-14,'',0,2,0,'Self-referral',42,'IOP 6 wks','Commuter',-14],
   ];
   const SB={'Samir Haddock':'PM','Devon Pierce':'AM','Hannah Osei':{mon:'AM',tue:'AM',wed:'PM',thu:'PM'},'Rosa Delgado':{tue:'AM',wed:'PM',fri:'AM'},'Wyatt Ferris':'PM','Casey Holloway':'AM','Nadia Vance':'EVE','Oliver Grant':'PM','Simone Achebe':'EVE','Ben Okonkwo':'AM'};
   const DCX={'Riley Starr':{dcType:'Completed treatment',dcCompleted:'Yes',dcLonger:'Yes'},'Frances Iwu':{dcType:'Stepped down to outside provider',dcCompleted:'No',dcLonger:'No'}};
@@ -549,7 +551,7 @@ function sample(){
     (LATER[r[0]]||[]).forEach(([l,o])=>plans.push({date:addDays(TODAY,o),loc:l,days:[...DEFAULT_DAYS[l]],blocks:normBlocks(l,DEFAULT_DAYS[l],uniform(DEFAULT_DAYS[l],'PM'))}));
     return {
     id:'c'+(i+1), name:r[0], loc:r[1], plans, admitDate:addDays(TODAY,r[2]),
-    dcDate:r[1]==='Discharged'?addDays(TODAY,r[4]):calcDc(addDays(TODAY,r[2]),r[10]),
+    dcDate:r[13]!=null?addDays(TODAY,r[4]):calcDc(addDays(TODAY,r[2]),r[10]),
     days:D(r[5]), clinician:CLIN[r[6]], caseManager:CM[r[7]], psychApn:APN[r[8]],
     referral:r[9], commitDays:r[10], commitNote:r[11], housing:r[12],
     dischargedOn:r[13]==null?'':addDays(TODAY,r[13]),
@@ -570,9 +572,9 @@ function archHist(kind,admit,dc,type,arch,loc){
 function sampleArchive(){
   const A=(id,name,kind,admit,dc,type,los,note,comp,longer,arch,loc)=>({id,name,kind,admitDate:addDays(TODAY,admit),dischargedOn:dc==null?'':addDays(TODAY,dc),dcType:type,commitDays:los,commitNote:note,dcCompleted:comp,dcLonger:longer,archivedOn:addDays(TODAY,arch),locAtRemoval:loc,clinician:CLIN[(+id.slice(1))%4],caseManager:CM[(+id.slice(1))%3],psychApn:APN[(+id.slice(1))%2],referral:['Inpatient psych unit','Detox center','Hospital ED','Self-referral','Outpatient therapist'][(+id.slice(1))%5],history:archHist(kind,admit,dc,type,arch,loc)});
   return [
-    A('a1','Morgan Ellery','discharge',-120,-41,'Completed treatment',70,'PC 3 wks, IOP 4 wks, OP 3 wks','Yes','Yes',-35,'Discharged'),
-    A('a2','Dana Whitlock','discharge',-95,-52,'Left against clinical advice',56,'PC 3 wks, IOP 5 wks','No','No',-45,'Discharged'),
-    A('a3','Jules Barrington','discharge',-88,-33,'Stepped down to outside provider',56,'IOP 8 wks','Yes','No',-30,'Discharged'),
+    A('a1','Morgan Ellery','discharge',-120,-41,'Completed treatment',70,'PC 3 wks, IOP 4 wks, OP 3 wks','Yes','Yes',-35,'OP'),
+    A('a2','Dana Whitlock','discharge',-95,-52,'Left against clinical advice',56,'PC 3 wks, IOP 5 wks','No','No',-45,'IOP3'),
+    A('a3','Jules Barrington','discharge',-88,-33,'Stepped down to outside provider',56,'IOP 8 wks','Yes','No',-30,'IOP5'),
     {...A('a4','Kai Nakamura','incomplete',-21,null,'',56,'PC 3 wks, then IOP','','',-18,'Pending'),failNote:'No-show on admit day. Two call attempts, no answer. Referral source notified.'},
     {...A('a5','Reese Calloway','incomplete',-9,null,'',42,'IOP 6 wks','','',-6,'Pending'),failNote:'Insurance authorization denied; referred back to outpatient therapist.'},
   ];
@@ -583,7 +585,8 @@ let state=load();
 const STAFF_ROLES=[['clinician','Clinicians','Clinician'],['caseManager','Case managers','Case manager'],['psychApn','Psych APNs','Psych APN']];
 function ensureStaff(s){s.staff=s.staff||{clinician:[...CLIN],caseManager:[...CM],psychApn:[...APN]};
   ['clinician','caseManager','psychApn'].forEach(k=>{s.staff[k]=s.staff[k]||[];s.clients.forEach(c=>{if(c[k]&&!s.staff[k].includes(c[k]))s.staff[k].push(c[k])})});return s}
-function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients)){s.archive=s.archive||[];return ensureStaff(s)}}catch(e){}return ensureStaff({clients:sample(),archive:sampleArchive(),seq:100})}
+function migrate(s){s.clients.forEach(c=>{if(c.loc==='Discharged'){c.loc=LEVELS.includes(c.lastLoc)?c.lastLoc:'OP';c.dcDone=true}});s.archive.forEach(a=>{if(a.locAtRemoval==='Discharged')a.locAtRemoval=LEVELS.includes(a.lastLoc)?a.lastLoc:'OP';if(a.loc==='Discharged')a.loc=a.locAtRemoval});return s}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients)){s.archive=s.archive||[];return ensureStaff(migrate(s))}}catch(e){}return ensureStaff({clients:sample(),archive:sampleArchive(),seq:100})}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 const byId=id=>state.clients.find(c=>c.id===id);
 let undoSnap=null;
@@ -603,7 +606,7 @@ function flags(c){
     return f;
   }
   if(dcMissing(c))f.push({lvl:'warn',text:'Discharge details missing'});
-  if(c.loc==='Discharged')return f;
+  if(isDC(c))return f;
   if(c.dischargedOn)f.push({lvl:'info',text:`Discharging ${fmt(c.dischargedOn)}`});
   const np=nextPlan(c);
   if(np){const d=diff(TODAY,np.date);if(d<=3)f.push({lvl:'info',text:d<=1?`Moves to ${np.loc} tomorrow`:`Moves to ${np.loc} in ${d}d`})}
@@ -630,7 +633,7 @@ function visible(c){
   if(F.q){const q=F.q.toLowerCase();if(![c.name,c.referral,c.clinician,c.caseManager,c.psychApn,c.loc].join(' ').toLowerCase().includes(q))return false}
   return true;
 }
-const recentDc=c=>c.loc!=='Discharged'||!c.dischargedOn||diff(c.dischargedOn,TODAY)<=30;
+const recentDc=c=>!isDC(c)||diff(c.dischargedOn,TODAY)<=30;
 
 /* ---------- automation: moving level of care ---------- */
 function daysText(d){return d.length?d.map(k=>DAY_LABEL[k]).join(', '):'none'}
@@ -676,7 +679,7 @@ function moveSlot(id,fromDay,toDay,toBlock){
 function runScheduled(){
   const done=[];
   state.clients.forEach(c=>{
-    if(c.dischargedOn&&c.dischargedOn<=TODAY&&c.loc!=='Discharged'&&c.loc!=='Pending'){const from=c.loc;c.lastLoc=from;c.loc='Discharged';c.days=[];c.blocks={};c.plans=[];c.history.push({date:c.dischargedOn,text:`Auto-discharged on date of discharge: ${from} → Discharged`});done.push(`${c.name} → Discharged`)}
+    if(isDC(c)&&!c.dcDone&&c.loc!=='Pending'){c.dcDone=true;c.days=[];c.blocks={};c.plans=[];c.history.push({date:c.dischargedOn,text:`Discharged on date of discharge (from ${c.loc})`});done.push(`${c.name} discharged`)}
     c.plans=(c.plans||[]).filter(p=>p.date&&p.loc).sort((a,b)=>a.date.localeCompare(b.date));
     while(c.plans.length&&c.plans[0].date<=TODAY){
       const p=c.plans.shift(), from=c.loc;
@@ -701,11 +704,11 @@ let view='census', sort={k:'loc',dir:1}, openId=null;
 
 let pop=null; // 'attn' | 'week' | null
 function renderStats(){
-  const act=state.clients.filter(c=>LEVELS.includes(c.loc));
-  const n=l=>state.clients.filter(c=>group(c.loc)===l).length;
+  const act=state.clients.filter(isActive);
+  const n=l=>state.clients.filter(c=>group(c.loc)===l&&!isDC(c)).length;
   const lpd=act.filter(c=>c.housing==='LPD').length;
   const admToday=state.clients.filter(c=>c.loc==='Pending'&&c.admitDate===TODAY).length;
-  const dcToday=state.clients.filter(c=>c.dischargedOn?c.dischargedOn===TODAY:(LEVELS.includes(c.loc)&&c.dcDate===TODAY)).length;
+  const dcToday=state.clients.filter(c=>c.dischargedOn?c.dischargedOn===TODAY:(isActive(c)&&c.dcDate===TODAY)).length;
   const tk=dayKey(TODAY), todayCount=act.filter(c=>c.days.includes(tk)).length;
   const attn=state.clients.filter(c=>recentDc(c)&&flags(c).some(f=>f.lvl!=='info')).length;
   const st=(k,v,s,cls='',sw='')=>`<div class="stat ${cls}"><div class="k">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
@@ -722,7 +725,7 @@ function renderStats(){
 }
 function renderStaffFilter(){
   const sel=$('#f-staff'), cur=F.staff;
-  const act=state.clients.filter(c=>c.loc!=='Discharged');
+  const act=state.clients.filter(c=>!isDC(c));
   const cnt=name=>act.filter(c=>[c.clinician,c.caseManager,c.psychApn].includes(name)).length;
   const uniq=k=>state.staff[k];
   const grp=(label,k)=>`<optgroup label="${label}">${uniq(k).map(s=>`<option value="${esc(s)}">${esc(s)} (${cnt(s)})</option>`).join('')}</optgroup>`;
@@ -746,8 +749,8 @@ function weekEvents(){
     let from=c.loc;
     (c.plans||[]).forEach(p=>{if(p.date>=mon&&p.date<=sat&&from!=='Pending')at(p.date,{t:'loc',c,txt:`${from} → ${p.loc}`});from=p.loc});
     (c.history||[]).forEach(h=>{const m=/^Auto-updated per schedule: (\S+) → (\S+)/.exec(h.text);if(m&&m[2]!=='Discharged'&&h.date>=mon&&h.date<=sat)at(h.date,{t:'loc',c,txt:`${m[1]} → ${m[2]}`})});
-    if(c.dischargedOn){if(c.dischargedOn>=mon&&c.dischargedOn<=sat)at(c.dischargedOn,{t:'dc',c,txt:c.loc==='Discharged'?'Discharged':'Discharge date set'})}
-    else if(LEVELS.includes(c.loc)&&c.dcDate>=mon&&c.dcDate<=sat)at(c.dcDate,{t:'dc',c,txt:c.dcDate<TODAY?'Projected DC · not yet discharged':'Projected DC'});
+    if(c.dischargedOn){if(c.dischargedOn>=mon&&c.dischargedOn<=sat)at(c.dischargedOn,{t:'dc',c,txt:isDC(c)?`Discharged from ${c.loc}`:'Discharge date set'})}
+    else if(isActive(c)&&c.dcDate>=mon&&c.dcDate<=sat)at(c.dcDate,{t:'dc',c,txt:c.dcDate<TODAY?'Projected DC · not yet discharged':'Projected DC'});
   });
   const ord={adm:0,loc:1,dc:2};days.forEach(d=>d.ev.sort((a,b)=>ord[a.t]-ord[b.t]||a.c.name.localeCompare(b.c.name)));
   return {mon,sat,days};
@@ -767,7 +770,7 @@ function showRowPop(btn){
 addEventListener('scroll',()=>$('#rowpop')?.remove(),true);
 function renderSettings(){
   const all=[...state.clients];
-  const cnt=(k,n)=>all.filter(c=>c[k]===n&&c.loc!=='Discharged').length;
+  const cnt=(k,n)=>all.filter(c=>c[k]===n&&!isDC(c)).length;
   return `<div class="settings">
   <h2 class="set-h">Settings</h2>
   <section class="set-card"><h3>Staff</h3><p class="help">These lists fill the Clinician, Case manager and Psych APN dropdowns on each client's card. Renaming someone updates every client assigned to them. Removing someone takes them off the dropdown only; clients already assigned keep the name until you reassign them.</p>
@@ -804,7 +807,7 @@ function weekControls(){
     <div class="seg wk" role="group" aria-label="Range">${[['3','3-day'],['full','Full week']].map(([v,l])=>`<button type="button" data-wmode="${v}" aria-pressed="${weekMode===v}">${l}</button>`).join('')}</div></div>`;
 }
 function renderSchedule(){
-  const list=state.clients.filter(c=>LEVELS.includes(c.loc)&&visible(c));
+  const list=state.clients.filter(c=>isActive(c)&&visible(c));
   const legend=`<div class="legend wk-hint"><span>Drag a name to another day or time block to change that client's schedule. PC is all day only, and evening groups run Mon, Tue and Thu only. Click a name for details.</span></div>`;
   const cols=weekDates().map(({k,date})=>{
     const cs=list.filter(c=>c.days.includes(k)).sort((a,b)=>RANK[a.loc]-RANK[b.loc]||a.name.localeCompare(b.name));
@@ -831,7 +834,7 @@ const COLS=[
   ['referral','Referral source',c=>c.referral],['commit','Incoming commitment',c=>c.commitDays||0],
 ];
 function sortedRows(){
-  const list=state.clients.filter(c=>visible(c)&&recentDc(c)&&(F.loc?group(c.loc)===F.loc:LEVELS.includes(c.loc)));
+  const list=state.clients.filter(c=>visible(c)&&recentDc(c)&&(F.loc?group(c.loc)===F.loc:c.loc!=='Pending'));
   const col=COLS.find(x=>x[0]===sort.k);
   const val=c=>sort.k==='loc'?RANK[c.loc]:col[2](c);
   return list.sort((a,b)=>{const x=val(a),y=val(b);return (x>y?1:x<y?-1:a.name.localeCompare(b.name))*sort.dir});
@@ -840,14 +843,14 @@ function cell(c,k){
   switch(k){
     case 'name':return `<td class="nm"><button class="linkish" data-open="${c.id}">${esc(c.name)}</button></td>`;
     case 'alert':{const f=flags(c);return `<td class="al-td">${f.length?`<button type="button" class="row-bell" data-rowbell="${c.id}" aria-label="${f.length} alert${f.length>1?'s':''} for ${esc(c.name)}" title="${esc(f.map(x=>x.text).join(' · '))}"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg></button>`:''}</td>`}
-    case 'loc':return c.loc==='Discharged'?`<td><span class="loc-sel static">Discharged</span>${c.lastLoc?`<span class="of"> from ${c.lastLoc}</span>`:''}</td>`:`<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
+    case 'loc':return isDC(c)?`<td><span class="loc-sel static" style="--c:${cvar(c.loc)}">${c.loc}</span><span class="of"> · discharged</span></td>`:`<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
     case 'housing':return `<td><select class="h-sel ${c.housing==='LPD'?'lpd':''}" data-row-house="${c.id}" aria-label="Residence for ${esc(c.name)}"><option ${c.housing==='LPD'?'selected':''}>LPD</option><option ${c.housing!=='LPD'?'selected':''}>Commuter</option></select></td>`;
     case 'admitDate':return `<td class="mono">${fmt(c.admitDate)}</td>`;
     case 'los':return `<td class="mono">${losDays(c)?losDays(c)+(c.commitDays?`<span class="of">/${c.commitDays}</span>`:''):'—'}</td>`;
-    case 'stepDown':{if(c.loc==='Discharged')return '<td><span class="of">n/a</span></td>';const np=nextPlan(c);
+    case 'stepDown':{if(isDC(c))return '<td><span class="of">n/a</span></td>';const np=nextPlan(c);
       return `<td><button class="plan-link" data-plan="${c.id}" title="Schedule LOC changes">${np?`<span class="mono">${fmt(np.date)}</span> → <b style="color:${cvar(np.loc)}">${np.loc==='Discharged'?'DC':np.loc}</b>${c.plans.length>1?` <span class="of">+${c.plans.length-1}</span>`:''}`:'<span class="add">+ Schedule</span>'}</button></td>`}
-    case 'dcDate':return `<td class="mono">${c.loc==='Discharged'?`DC'd ${fmt(c.dischargedOn)}`:fmt(c.dcDate)}</td>`;
-    case 'days':return `<td>${LEVELS.includes(c.loc)?`<button class="plan-link sched" data-sched="${c.id}" title="Edit schedule">${schedHTML(c)||'<span class="add">+ Set days</span>'}</button>`:'—'}</td>`;
+    case 'dcDate':return `<td class="mono">${isDC(c)?`DC'd ${fmt(c.dischargedOn)}`:fmt(c.dcDate)}</td>`;
+    case 'days':return `<td>${isActive(c)?`<button class="plan-link sched" data-sched="${c.id}" title="Edit schedule">${schedHTML(c)||'<span class="add">+ Set days</span>'}</button>`:'—'}</td>`;
     case 'commit':return `<td>${esc(c.commitNote)||'—'}</td>`;
     default:return `<td>${esc(c[k])||'—'}</td>`;
   }
@@ -855,11 +858,11 @@ function cell(c,k){
 function renderCensus(){
   const rows=sortedRows();
   const n=l=>state.clients.filter(c=>group(c.loc)===l&&visible(c)&&recentDc(c)).length;
-  const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['Pending','',...GROUPS,'Discharged'].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l?cvar(l):'var(--accent)'}" ${l?'':'title="Everyone in PC, IOP, EIOP or OP (not Pending or Discharged)"'}>${l||'Active'} <span>${l?n(l):state.clients.filter(c=>visible(c)&&LEVELS.includes(c.loc)).length}</span></button>`).join('')}</div>`;
+  const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['Pending','',...GROUPS].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l?cvar(l):'var(--accent)'}" ${l?'':'title="Everyone who is not Pending"'}>${l||'Active'} <span>${l?n(l):state.clients.filter(c=>visible(c)&&recentDc(c)&&c.loc!=='Pending').length}</span></button>`).join('')}</div>`;
   return `<div class="tbar">${chips}<p>Change LOC right in the row. Click a name for full details.</p>
     <button class="btn small" id="btn-copy">Copy as spreadsheet (CSV)</button></div>
   <div class="tablewrap scroll"><table class="census"><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
-  <tbody>${rows.map(c=>`<tr style="--c:${cvar(c.loc)}" class="${c.loc==='Discharged'?'dc':''}">${COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="${COLS.length}" class="of">No clients match these filters.</td></tr>`}</tbody></table></div>`;
+  <tbody>${rows.map(c=>`<tr style="--c:${cvar(c.loc)}" class="${isDC(c)?'dc':''}">${COLS.map(([k])=>cell(c,k)).join('')}</tr>`).join('')||`<tr><td colspan="${COLS.length}" class="of">No clients match these filters.</td></tr>`}</tbody></table></div>`;
 }
 /* Puts the view's HTML in place. On the Week view the search/filter bar sits between the legend and the calendar. */
 function setView(html){
@@ -980,12 +983,12 @@ function renderDrawer(){
       <div class="summary">${fl.map(f=>`<span class="flag ${f.lvl}">${esc(f.text)}</span>`).join('')}${los?`<span class="flag info">Day ${los}${c.commitDays?` of ${c.commitDays}`:''}</span>`:''}</div>
       <div class="grid2">
         <div class="fld full"><label for="d-name">Client name</label><input id="d-name" data-f="name" value="${esc(c.name)}"></div>
-        <div class="fld"><label for="d-loc">Level of care</label>${c.loc==='Discharged'?`<input id="d-loc" value="Discharged${c.lastLoc?` (from ${c.lastLoc})`:''}" disabled><span class="help">Clear the date of discharge to return the client to the census.</span>`:`<select id="d-loc" data-loc-select>${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select>`}</div>
+        <div class="fld"><label for="d-loc">Level of care</label>${isDC(c)?`<input id="d-loc" value="${c.loc} · discharged ${fmt(c.dischargedOn)}" disabled><span class="help">Clear the date of discharge to return the client to active care.</span>`:`<select id="d-loc" data-loc-select>${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select>`}</div>
         <div class="fld"><span class="lbl">Residence</span><div class="seg">${['LPD','Commuter'].map(h=>`<button type="button" data-house="${h}" aria-pressed="${c.housing===h}">${h}</button>`).join('')}</div></div>
         <div class="fld"><label for="d-admit">Admission date</label><input id="d-admit" type="date" data-f="admitDate" value="${c.admitDate}"></div>
-        <div class="fld"><span class="lbl">Projected step-down</span>${c.loc==='Discharged'?'<span class="of">n/a</span>':`<button type="button" class="plan-link boxed" data-plan="${c.id}">${nextPlan(c)?`${fmt(nextPlan(c).date)} → ${nextPlan(c).loc}${c.plans.length>1?` (+${c.plans.length-1})`:''}`:'+ Schedule a change'}</button>`}</div>
+        <div class="fld"><span class="lbl">Projected step-down</span>${isDC(c)?'<span class="of">n/a</span>':`<button type="button" class="plan-link boxed" data-plan="${c.id}">${nextPlan(c)?`${fmt(nextPlan(c).date)} → ${nextPlan(c).loc}${c.plans.length>1?` (+${c.plans.length-1})`:''}`:'+ Schedule a change'}</button>`}</div>
         <div class="fld"><label for="d-dc">Projected DC</label><input id="d-dc" type="date" data-f="dcDate" value="${c.dcDate}"><span class="help">Set from admission + LOS, kept off weekends. You can change it.</span></div>
-        ${LEVELS.includes(c.loc)?`<div class="fld full"><span class="lbl">Schedule · ${freq(c)}</span><button type="button" class="plan-link boxed" data-sched="${c.id}">${schedHTML(c)||'+ Set days and times'}</button></div>`:''}
+        ${isActive(c)?`<div class="fld full"><span class="lbl">Schedule · ${freq(c)}</span><button type="button" class="plan-link boxed" data-sched="${c.id}">${schedHTML(c)||'+ Set days and times'}</button></div>`:''}
       </div>
       <div class="sec-h">Care team</div>
       <div class="grid2">
@@ -1020,13 +1023,14 @@ function setField(c,f,v){
   if(f==='name'&&!v.trim())return;
   if(f==='dischargedOn'){
     snap();
-    if(v&&v<=TODAY&&c.loc!=='Discharged'){const from=c.loc;c.lastLoc=from;c.loc='Discharged';c.days=[];c.blocks={};c.plans=[];c.history.push({date:v,text:`${from} → Discharged`})}
-    if(!v&&c.loc==='Discharged'){const back=c.lastLoc||'Pending';c.loc=back;setSched(c,DEFAULT_DAYS[back]||[],{});c.dcType='';c.dcCompleted='';c.dcLonger='';c.history.push({date:TODAY,text:`Date of discharge cleared: back to ${back}`})}
+    const was=isDC(c);
+    if(v&&v<=TODAY&&!was&&c.loc!=='Pending'){c.dcDone=true;c.days=[];c.blocks={};c.plans=[];c.history.push({date:v,text:`Discharged from ${c.loc}`})}
+    if(!v&&was){c.dcDone=false;if(LEVELS.includes(c.loc))setSched(c,DEFAULT_DAYS[c.loc]||[],{});c.dcType='';c.dcCompleted='';c.dcLonger='';c.history.push({date:TODAY,text:`Date of discharge cleared: back in ${c.loc}`})}
     if(v)c.history.push({date:TODAY,text:`Date of discharge set to ${fmt(v)}`});
   }
   c[f]=v;
   if(f==='dcType'&&v)c.history.push({date:TODAY,text:`Discharge type: ${v}`});
-  if((f==='commitDays'||f==='admitDate')&&c.loc!=='Discharged'&&c.commitDays&&c.admitDate){c.dcDate=calcDc(c.admitDate,c.commitDays)}
+  if((f==='commitDays'||f==='admitDate')&&!isDC(c)&&c.commitDays&&c.admitDate){c.dcDate=calcDc(c.admitDate,c.commitDays)}
   save();
   const keepFocus=document.activeElement?.id;
   renderStats();renderStaffFilter();
@@ -1200,7 +1204,7 @@ document.addEventListener('click',e=>{
   const ao=t.closest('[data-arch-open]');if(ao){openArchived(ao.dataset.archOpen);return}
   const ab=t.closest('[data-arch-kind]');if(ab){archKind=ab.dataset.archKind;render();return}
   const rs=t.closest('[data-restore]');if(rs){const r=state.archive.find(x=>x.id===rs.dataset.restore);if(!r)return;snap();
-    const {kind,archivedOn,locAtRemoval,...cl}=r;cl.loc=locAtRemoval||(cl.dischargedOn?'Discharged':'Pending');cl.days=cl.days||[];cl.blocks=cl.blocks||{};cl.plans=cl.plans||[];cl.history=[...(cl.history||[]),{date:TODAY,text:'Restored from archive'}];
+    const {kind,archivedOn,locAtRemoval,...cl}=r;cl.loc=(locAtRemoval&&locAtRemoval!=='Discharged')?locAtRemoval:(cl.lastLoc||(cl.dischargedOn?'OP':'Pending'));cl.days=cl.days||[];cl.blocks=cl.blocks||{};cl.plans=cl.plans||[];cl.history=[...(cl.history||[]),{date:TODAY,text:'Restored from archive'}];
     cl.caseManager=cl.caseManager||CM[0];cl.psychApn=cl.psychApn||APN[0];cl.referral=cl.referral||'';cl.housing=cl.housing||'Commuter';cl.dcDate=cl.dcDate||'';
     state.archive=state.archive.filter(x=>x.id!==r.id);state.clients.push(cl);save();closeLayer();render();toast(`${r.name} restored to the census.`,true);return}
   if(t.id==='btn-copy-arch'){copyText(archCsv(),t,'Copy this list (CSV)');return}
@@ -1389,7 +1393,7 @@ function previewRows(rows){
     const loc=parseLoc(g('loc'),g('freq'))||'Pending';
     const cm=parseCommit(g('commit'));
     const name=String(g('name')||'').trim();if(!name)return null;
-    const sd=parseDate(g('stepDown')), to=NEXT_LOC[loc]==='Discharged'?null:NEXT_LOC[loc];
+    const sd=parseDate(g('stepDown')), to=loc==='Discharged'?null:NEXT_LOC[loc];
     const plans=sd&&to&&loc!=='Discharged'?[{date:sd,loc:to,days:[...(DEFAULT_DAYS[to]||[])]}]:[];
     const st=String(g('days')).toLowerCase(), hint=/6\s*-\s*9|eve|night/.test(st)?'EVE':/12:30|after|pm/.test(st)?'PM':'AM';
     const dd=LEVELS.includes(loc)?parseDays(g('days'),loc):[];
@@ -1397,7 +1401,8 @@ function previewRows(rows){
     return {id:'i'+(state.seq++),name,loc,plans,blocks:normBlocks(loc,dd,uniform(dd,hint)),admitDate:parseDate(g('admitDate')),dcDate:parseDate(g('dcDate'))||(loc!=='Discharged'?calcDc(parseDate(g('admitDate')),cm.commitDays):''),
       days:dd,clinician:String(g('clinician')||'').trim(),caseManager:String(g('caseManager')||'').trim(),psychApn:String(g('psychApn')||'').trim(),
       referral:String(g('referral')||'').trim(),...cm,housing:/lpd|resid|sober|house|yes/i.test(String(g('housing')))?'LPD':'Commuter',
-      dischargedOn:loc==='Discharged'?(parseDate(g('dcDate'))||TODAY):'',history:[{date:TODAY,text:'Imported from spreadsheet'}]};
+      dischargedOn:loc==='Discharged'?(parseDate(g('dcDate'))||TODAY):'',history:[{date:TODAY,text:'Imported from spreadsheet'}],
+      ...(loc==='Discharged'?{loc:'OP',dcDone:true}:{})};
   }).filter(Boolean);
   pending=clients;
   const found=Object.keys(FIELD_LABEL).filter(k=>map.includes(k)), missing=Object.keys(FIELD_LABEL).filter(k=>!map.includes(k)&&k!=='freq');
