@@ -883,7 +883,7 @@ function renderSchedule(){
 const COLS=[
   ['name','Client',c=>c.name],['alert','Alerts',c=>{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return f.length?sev[f[0].lvl]:9}],
   ['loc','LOC',c=>c.loc],['housing','Residence',c=>c.housing],
-  ['admitDate','Admitted',c=>c.admitDate],['los','Day #',c=>losDays(c)||''],
+  ['admitDate','Admitted',c=>c.admitDate],['los','LOS',c=>losDays(c)||''],
   ['stepDown','Proj. step-down',c=>nextPlan(c)?.date||'9'],['dcDate','Proj. DC',c=>c.dcDate],
   ['days','Schedule',c=>c.days.map(d=>DAYS.indexOf(d)+BLOCK_ORDER.indexOf(blk(c,d))/10).join('')],
   ['clinician','Clinician',c=>c.clinician],['caseManager','Case manager',c=>c.caseManager],['psychApn','Psych APN',c=>c.psychApn],
@@ -902,7 +902,7 @@ function cell(c,k){
     case 'loc':return isDC(c)?`<td><span class="loc-sel static" style="--c:${cvar(c.loc)}">${c.loc}</span><span class="of"> · discharged</span></td>`:`<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${PICK_LOCS.map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
     case 'housing':return `<td><select class="h-sel ${c.housing==='LPD'?'lpd':''}" data-row-house="${c.id}" aria-label="Residence for ${esc(c.name)}"><option ${c.housing==='LPD'?'selected':''}>LPD</option><option ${c.housing!=='LPD'?'selected':''}>Commuter</option></select></td>`;
     case 'admitDate':return `<td class="mono">${fmt(c.admitDate)}</td>`;
-    case 'los':return `<td class="mono">${losDays(c)?losDays(c)+(c.commitDays?`<span class="of">/${c.commitDays}</span>`:''):'—'}</td>`;
+    case 'los':return `<td class="mono">${losDays(c)||'—'}</td>`;
     case 'stepDown':{if(isDC(c))return '<td><span class="of">n/a</span></td>';const np=nextPlan(c);
       return `<td><button class="plan-link" data-plan="${c.id}" title="Schedule LOC changes">${np?`<span class="mono">${fmt(np.date)}</span> → <b style="color:${cvar(np.loc)}">${np.loc==='Discharged'?'DC':np.loc}</b>${c.plans.length>1?` <span class="of">+${c.plans.length-1}</span>`:''}`:'<span class="add">+ Schedule</span>'}</button></td>`}
     case 'dcDate':return `<td class="mono">${isDC(c)?`DC'd ${fmt(c.dischargedOn)}`:fmt(c.dcDate)}</td>`;
