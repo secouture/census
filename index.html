@@ -52,6 +52,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .brand .date{color:var(--muted);font-size:13px}
 .tabs{display:flex;gap:2px;background:var(--sunk);padding:3px;border-radius:9px}
 .tabs a{padding:6px 14px;border-radius:7px;text-decoration:none;color:var(--muted);font-weight:600;font-size:13px}
+.tabs a.gear{display:inline-flex;align-items:center;padding:6px 9px}
+body.v-settings #stats,body.v-settings .filters{display:none}
 .tabs a[aria-current="page"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
 .btn{border:1px solid var(--line);background:var(--surface);padding:7px 12px;border-radius:8px;font-weight:600;font-size:13px}
 .btn:hover{border-color:var(--muted)}
@@ -331,6 +333,25 @@ table.arch td{white-space:normal}
 .maplist span.miss{color:var(--warn)}
 .err{color:var(--crit)!important}
 
+/* Settings */
+.settings{display:flex;flex-direction:column;gap:14px;max-width:980px}
+.set-h{font-family:var(--f-display);font-size:20px;margin:6px 0 0}
+.set-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.set-card h3{margin:0 0 4px;font-size:15px}
+.set-card .help{margin:0 0 12px;color:var(--muted);font-size:13px;max-width:70ch}
+.staff-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.staff-col h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.staff-col h4 span{font-weight:500}
+.staff-col ul{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:4px}
+.staff-col li{display:flex;align-items:center;gap:6px}
+.staff-col li input{flex:1;min-width:0}
+.staff-col li .cl{font-size:12px;color:var(--muted);min-width:18px;text-align:right;font-variant-numeric:tabular-nums}
+.staff-col li .x{border:0;background:none;color:var(--muted);font-size:18px;line-height:1;padding:2px 6px;border-radius:6px;cursor:pointer}
+.staff-col li .x:hover{color:var(--crit);background:var(--sunk)}
+.staff-col li.empty{color:var(--muted);font-size:13px}
+.staff-add{display:flex;gap:6px}
+.staff-add input{flex:1;min-width:0}
+
 /* Toast */
 .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 14px;display:flex;gap:14px;align-items:center;z-index:80;max-width:calc(100% - 32px);font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .toast button{background:none;border:0;color:var(--bg);font-weight:700;text-decoration:underline;padding:0}
@@ -357,9 +378,9 @@ table.arch td{white-space:normal}
       <a href="#census" data-view="census">Census</a>
       <a href="#schedule" data-view="schedule">Week</a>
       <a href="#archive" data-view="archive">Archive</a>
+      <a href="#settings" data-view="settings" class="gear" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.5a.5.5 0 0 0-.6-.2l-2.5 1a7.3 7.3 0 0 0-1.7-1L14.4 2.4a.5.5 0 0 0-.5-.4h-4a.5.5 0 0 0-.5.4L9 5.1a7.3 7.3 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.5a.5.5 0 0 0 .1.6L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.5c.1.2.4.3.6.2l2.5-1c.5.4 1.1.7 1.7 1l.4 2.7c0 .2.2.4.5.4h4c.2 0 .5-.2.5-.4l.4-2.7c.6-.3 1.2-.6 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.5a.5.5 0 0 0-.1-.6ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></a>
     </nav></div>
     <div class="actions">
-      <button class="btn" id="btn-import">Import spreadsheet</button>
       <button class="btn primary" id="btn-add">Add client</button>
     </div>
   </header>
@@ -525,7 +546,10 @@ function sampleArchive(){
 
 /* ---------- state ---------- */
 let state=load();
-function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients)){s.archive=s.archive||[];return s}}catch(e){}return{clients:sample(),archive:sampleArchive(),seq:100}}
+const STAFF_ROLES=[['clinician','Clinicians','Clinician'],['caseManager','Case managers','Case manager'],['psychApn','Psych APNs','Psych APN']];
+function ensureStaff(s){s.staff=s.staff||{clinician:[...CLIN],caseManager:[...CM],psychApn:[...APN]};
+  ['clinician','caseManager','psychApn'].forEach(k=>{s.staff[k]=s.staff[k]||[];s.clients.forEach(c=>{if(c[k]&&!s.staff[k].includes(c[k]))s.staff[k].push(c[k])})});return s}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients)){s.archive=s.archive||[];return ensureStaff(s)}}catch(e){}return ensureStaff({clients:sample(),archive:sampleArchive(),seq:100})}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 const byId=id=>state.clients.find(c=>c.id===id);
 let undoSnap=null;
@@ -665,7 +689,7 @@ function renderStaffFilter(){
   const sel=$('#f-staff'), cur=F.staff;
   const act=state.clients.filter(c=>c.loc!=='Discharged');
   const cnt=name=>act.filter(c=>[c.clinician,c.caseManager,c.psychApn].includes(name)).length;
-  const uniq=k=>[...new Set(state.clients.map(c=>c[k]).filter(Boolean))].sort();
+  const uniq=k=>state.staff[k];
   const grp=(label,k)=>`<optgroup label="${label}">${uniq(k).map(s=>`<option value="${esc(s)}">${esc(s)} (${cnt(s)})</option>`).join('')}</optgroup>`;
   sel.innerHTML=`<option value="">All staff</option>${grp('Clinicians','clinician')}${grp('Case managers','caseManager')}${grp('Psych APNs','psychApn')}`;
   sel.value=cur;
@@ -692,6 +716,19 @@ function weekEvents(){
   });
   const ord={adm:0,loc:1,dc:2};days.forEach(d=>d.ev.sort((a,b)=>ord[a.t]-ord[b.t]||a.c.name.localeCompare(b.c.name)));
   return {mon,sat,days};
+}
+function renderSettings(){
+  const all=[...state.clients];
+  const cnt=(k,n)=>all.filter(c=>c[k]===n&&c.loc!=='Discharged').length;
+  return `<div class="settings">
+  <h2 class="set-h">Settings</h2>
+  <section class="set-card"><h3>Staff</h3><p class="help">These lists fill the Clinician, Case manager and Psych APN dropdowns on each client's card. Renaming someone updates every client assigned to them. Removing someone takes them off the dropdown only; clients already assigned keep the name until you reassign them.</p>
+  <div class="staff-grid">${STAFF_ROLES.map(([k,plural,one])=>`<div class="staff-col"><h4>${plural} <span>${state.staff[k].length}</span></h4>
+    <ul>${state.staff[k].map((n,i)=>`<li><input value="${esc(n)}" data-staff-edit="${k}" data-i="${i}" aria-label="${one} name"><span class="cl" title="Active clients assigned">${cnt(k,n)}</span><button type="button" class="x" data-staff-del="${k}" data-i="${i}" aria-label="Remove ${esc(n)}">×</button></li>`).join('')||'<li class="empty">No one yet</li>'}</ul>
+    <form class="staff-add" data-staff-add="${k}"><input placeholder="Add ${one.replace('Case','case').replace('Clinician','clinician')}" aria-label="New ${one} name"><button class="btn small" type="submit">Add</button></form></div>`).join('')}</div></section>
+  <section class="set-card"><h3>Import spreadsheet</h3><p class="help">Bring in clients from an Excel (.xlsx) or CSV file, or paste rows copied from Excel. Columns are matched by their headings and you see a preview before anything is added. New staff names in the file are added to the staff lists.</p>
+  <button class="btn primary" id="btn-import">Import spreadsheet</button></section>
+  </div>`;
 }
 function renderWeekOverview(wk){
   const tot=t=>wk.days.reduce((n,d)=>n+d.ev.filter(e=>e.t===t).length,0);
@@ -778,8 +815,9 @@ function renderCensus(){
 function render(){
   $('#today').textContent=`${pISO(TODAY).toLocaleDateString('en-US',{weekday:'long'})} ${fmt(TODAY)}`;
   document.querySelectorAll('.tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.view===view?'page':'false'));
+  document.body.classList.toggle('v-settings',view==='settings');
   renderStats();renderStaffFilter();
-  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='archive'?renderArchive():renderCensus();
+  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='archive'?renderArchive():view==='settings'?renderSettings():renderCensus();
   if(openId)renderDrawer();
 }
 
@@ -868,7 +906,8 @@ function openClient(id){openId=id;confirmDel=false;renderDrawer();setTimeout(()=
 function renderDrawer(){
   const c=byId(openId);if(!c){closeLayer();return}
   const opt=(arr,v)=>arr.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
-  const staff=k=>[...new Set(state.clients.map(x=>x[k]).filter(Boolean))].sort();
+  const staff=k=>state.staff[k];
+  const sopt=(k,v)=>`<option value="" ${v?'':'selected'}>— Not assigned —</option>`+staff(k).map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')+(v&&!staff(k).includes(v)?`<option selected value="${esc(v)}">${esc(v)} (not on staff list)</option>`:'');
   const fl=flags(c), los=losDays(c);
   const scroll=$('.drawer-b')?.scrollTop||0;
   $('#layer').innerHTML=`<div class="scrim" data-close></div>
@@ -887,9 +926,9 @@ function renderDrawer(){
       </div>
       <div class="sec-h">Care team</div>
       <div class="grid2">
-        <div class="fld"><label for="d-clin">Clinician</label><select id="d-clin" data-f="clinician">${opt(staff('clinician'),c.clinician)}</select></div>
-        <div class="fld"><label for="d-cm">Case manager</label><select id="d-cm" data-f="caseManager">${opt(staff('caseManager'),c.caseManager)}</select></div>
-        <div class="fld"><label for="d-apn">Psych APN</label><select id="d-apn" data-f="psychApn">${opt(staff('psychApn'),c.psychApn)}</select></div>
+        <div class="fld"><label for="d-clin">Clinician</label><select id="d-clin" data-f="clinician">${sopt('clinician',c.clinician)}</select></div>
+        <div class="fld"><label for="d-cm">Case manager</label><select id="d-cm" data-f="caseManager">${sopt('caseManager',c.caseManager)}</select></div>
+        <div class="fld"><label for="d-apn">Psych APN</label><select id="d-apn" data-f="psychApn">${sopt('psychApn',c.psychApn)}</select></div>
         <div class="fld"><label for="d-ref">Referral source</label><input id="d-ref" data-f="referral" value="${esc(c.referral)}"></div>
       </div>
       <div class="sec-h">Incoming commitment</div>
@@ -928,7 +967,7 @@ function setField(c,f,v){
   save();
   const keepFocus=document.activeElement?.id;
   renderStats();renderStaffFilter();
-  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='archive'?renderArchive():renderCensus();
+  $('#view').innerHTML=view==='schedule'?renderSchedule():view==='archive'?renderArchive():view==='settings'?renderSettings():renderCensus();
   if(f!=='name'&&f!=='referral'&&f!=='commitNote'){renderDrawer();if(keepFocus)document.getElementById(keepFocus)?.focus()}
   else $('.drawer-h h2').textContent=c.name;
 }
@@ -941,7 +980,18 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-row-loc]')){moveLoc(e.target.dataset.rowLoc,e.target.value);return}
   if(e.target.matches('[data-row-house]')){const r=byId(e.target.dataset.rowHouse);snap();r.housing=e.target.value;r.history.push({date:TODAY,text:`Housing changed to ${r.housing}`});save();render();toast(`${r.name} now marked ${r.housing}.`,true);return}
   if(e.target.matches('[data-loc-select]')&&c){moveLoc(c.id,e.target.value);return}
+  if(e.target.matches('[data-staff-edit]')){const k=e.target.dataset.staffEdit,i=+e.target.dataset.i,old=state.staff[k][i],n=e.target.value.trim();
+    if(!n||n===old){e.target.value=old;return}
+    if(state.staff[k].includes(n)){toast(`${n} is already on the list.`);e.target.value=old;return}
+    snap();state.staff[k][i]=n;let m=0;[...state.clients,...state.archive].forEach(c=>{if(c[k]===old){c[k]=n;m++}});
+    if(F.staff===old)F.staff=n;save();render();toast(`Renamed ${old} to ${n}${m?` on ${m} client${m>1?'s':''}`:''}.`,true);return}
   if(e.target.dataset.f&&c&&e.target.closest('.drawer'))setField(c,e.target.dataset.f,e.target.value);
+});
+document.addEventListener('submit',e=>{
+  const f=e.target.closest('[data-staff-add]');if(!f)return;e.preventDefault();
+  const k=f.dataset.staffAdd, inp=f.querySelector('input'), n=inp.value.trim();if(!n)return;
+  if(state.staff[k].includes(n)){toast(`${n} is already on the list.`);return}
+  state.staff[k].push(n);save();render();setTimeout(()=>document.querySelector(`[data-staff-add="${k}"] input`)?.focus(),0);
 });
 document.addEventListener('input',e=>{
   if(e.target.matches('[data-failnote]')){const r=state.archive.find(x=>x.id===e.target.dataset.failnote);if(r){r.failNote=e.target.value;save()}return}
@@ -1086,6 +1136,8 @@ document.addEventListener('click',e=>{
   if(t.id==='btn-copy-arch'){copyText(archCsv(),t,'Copy this list (CSV)');return}
   if(t.closest('[data-undo]')){if(undoSnap){state=JSON.parse(undoSnap);undoSnap=null;save();render();toast('Undone.')}return}
   if(t.id==='btn-copy'){copyCsv(t);return}
+  if(t.id==='btn-import'){openImport();return}
+  const sd=t.closest('[data-staff-del]');if(sd){const k=sd.dataset.staffDel,i=+sd.dataset.i,n=state.staff[k][i];snap();state.staff[k].splice(i,1);save();render();toast(`${n} removed from the list.`,true);return}
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&$('#confirm-slot').innerHTML){closeConfirm();return}
@@ -1095,14 +1147,14 @@ document.addEventListener('keydown',e=>{
 });
 $('#btn-add').addEventListener('click',()=>{
   snap();const id='n'+(state.seq++);
-  state.clients.push({id,name:'New client',loc:'Pending',plans:[],admitDate:addDays(TODAY,1),dcDate:'',days:[],blocks:{},clinician:CLIN[0],caseManager:CM[0],psychApn:APN[0],referral:'',commitDays:0,commitNote:'',housing:'Commuter',dischargedOn:'',history:[{date:TODAY,text:'Referral entered'}]});
+  state.clients.push({id,name:'New client',loc:'Pending',plans:[],admitDate:addDays(TODAY,1),dcDate:'',days:[],blocks:{},clinician:'',caseManager:'',psychApn:'',referral:'',commitDays:0,commitNote:'',housing:'Commuter',dischargedOn:'',history:[{date:TODAY,text:'Referral entered'}]});
   save();if(view!=='census')location.hash='#census';render();openClient(id);
   setTimeout(()=>{const n=$('#d-name');n?.focus();n?.select()},10);
 });
 let resetArmed=false;
 $('#btn-reset').addEventListener('click',e=>{
   if(!resetArmed){resetArmed=true;e.target.textContent='Click again to reset';setTimeout(()=>{resetArmed=false;e.target.textContent='Reset sample data'},3000);return}
-  resetArmed=false;e.target.textContent='Reset sample data';snap();state={clients:sample(),archive:sampleArchive(),seq:100};save();closeLayer();render();toast('Sample data restored.',true);
+  resetArmed=false;e.target.textContent='Reset sample data';snap();state=ensureStaff({clients:sample(),archive:sampleArchive(),seq:100});save();closeLayer();render();toast('Sample data restored.',true);
 });
 
 /* ---------- toast ---------- */
@@ -1255,7 +1307,7 @@ function openImport(){
     <div class="actions"><button class="btn" id="imp-sample">Try a sample sheet</button><span style="flex:1"></span><button class="btn" data-close>Cancel</button></div>
   </div>`;
 }
-$('#btn-import').addEventListener('click',openImport);
+
 function previewRows(rows){
   const box=$('#imp-preview');
   if(!rows||rows.length<2){box.innerHTML='<p class="err">I couldn\'t find a heading row plus at least one client row.</p>';return}
@@ -1316,13 +1368,14 @@ Sample Person C,${fmt2(3)},,,Pending,,,J. Lindqvist LMFT,S. Haddad,L. Moreau PMH
   if((e.target.id==='imp-add'||e.target.id==='imp-replace')&&pending){
     snap();const n=pending.length;
     if(e.target.id==='imp-replace')state.clients=pending;else state.clients.push(...pending);
+    ensureStaff(state);
     pending=null;const done=runScheduled();save();closeLayer();render();toast(`Imported ${n} clients.${done.length?` Applied ${done.length} scheduled change(s) dated today or earlier.`:''}`,true);
   }
 });
 function fmt2(n){const d=pISO(addDays(TODAY,n));return `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`}
 
 /* ---------- routing ---------- */
-function route(){const h=location.hash.slice(1);view=['schedule','archive'].includes(h)?h:'census';render()}
+function route(){const h=location.hash.slice(1);view=['schedule','archive','settings'].includes(h)?h:'census';render()}
 addEventListener('hashchange',route);
 const bootDone=runScheduled();
 route();
