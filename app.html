@@ -9,7 +9,7 @@
 :root{
   --bg:#f3f6f7; --surface:#ffffff; --sunk:#e9eef0; --ink:#16232a; --muted:#5a6a73; --line:#d7dfe3;
   --accent:#2c6b70; --accent-ink:#ffffff;
-  --pend:#a86a12; --php:#5946b2; --iop:#16788a; --op:#3a8549; --dc:#76858d;
+  --pend:#a86a12; --php:#5946b2; --iop:#16788a; --op:#3a8549; --eiop:#3d5a9e; --dc:#76858d;
   --warn:#a85a06; --crit:#b3261e; --info:#2c6b70;
   --shadow:0 1px 2px rgba(22,35,42,.06),0 4px 14px rgba(22,35,42,.06);
   --f-display:"Manrope",ui-sans-serif,system-ui,sans-serif;
@@ -19,13 +19,13 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0e161a; --surface:#152127; --sunk:#1b2a31; --ink:#e3ebee; --muted:#97a9b2; --line:#26363e;
   --accent:#72b6b9; --accent-ink:#0e161a;
-  --pend:#e0ad5c; --php:#ab9ff2; --iop:#5ec5d8; --op:#7fcc90; --dc:#8d9ba2;
+  --pend:#e0ad5c; --php:#ab9ff2; --iop:#5ec5d8; --op:#7fcc90; --eiop:#8fb0f0; --dc:#8d9ba2;
   --warn:#f0a44c; --crit:#f2776c; --info:#72b6b9;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0e161a; --surface:#152127; --sunk:#1b2a31; --ink:#e3ebee; --muted:#97a9b2; --line:#26363e;
   --accent:#72b6b9; --accent-ink:#0e161a;
-  --pend:#e0ad5c; --php:#ab9ff2; --iop:#5ec5d8; --op:#7fcc90; --dc:#8d9ba2;
+  --pend:#e0ad5c; --php:#ab9ff2; --iop:#5ec5d8; --op:#7fcc90; --eiop:#8fb0f0; --dc:#8d9ba2;
   --warn:#f0a44c; --crit:#f2776c; --info:#72b6b9;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25); color-scheme:dark}
 
@@ -114,6 +114,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 /* Schedule */
 .week{display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:10px;overflow-x:auto;padding-bottom:6px}
 .day{background:var(--sunk);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px;border:2px solid transparent;min-height:200px}
+.day.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--sunk))}
 .day.today{border-color:color-mix(in srgb,var(--accent) 50%,transparent)}
 .day-h{padding:0 2px 6px;border-bottom:1px solid var(--line)}
 .day-h .dn{font-family:var(--f-display);font-weight:800;font-size:16px}
@@ -164,18 +165,13 @@ table.census tr.dc td{color:var(--muted)}
 .plan-link:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
 .plan-link .add{color:var(--accent);font-weight:600}
 .plan-link.boxed{border:1px solid var(--line);background:var(--bg);padding:7px 9px;text-decoration:none;font-weight:600;color:var(--accent)}
-.s-sel{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:4px 6px;font-size:13px;font-weight:600}
 .planner{gap:14px}
 .now{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,var(--c) 10%,var(--surface));font-size:13px}
 .now b{color:var(--c)}
 .now .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700}
 .slot{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px 12px;display:flex;flex-direction:column;gap:10px;margin:0;min-width:0}
 .slot legend{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;padding:0 4px}
-.slot-g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.ses{border:1px dashed transparent;border-radius:8px;padding:4px;display:flex;flex-direction:column;gap:5px;min-height:34px}
-.ses.over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
-.ses-h{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;padding:2px 2px 0}
-.ses-h span{font-weight:500;margin-left:3px}
+.slot-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 @media (max-width:560px){.slot-g{grid-template-columns:1fr}}
 
 /* Drawer */
@@ -266,18 +262,21 @@ table.census tr.dc td{color:var(--muted)}
 const DAYS=['mon','tue','wed','thu','fri','sat'];
 const DAY_LABEL={mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat'};
 const DAY_SHORT={mon:'M',tue:'T',wed:'W',thu:'Th',fri:'F',sat:'Sa'};
-const LOCS=['Pending','PHP','IOP','OP','Discharged'];
-const LEVELS=['PHP','IOP','OP'];
-const LOC_NAME={Pending:'Pending',PHP:'PHP',IOP:'IOP',OP:'OP',Discharged:'Discharged'};
-const LOC_SUB={Pending:'Referred, not yet admitted',PHP:'Partial hospitalization',IOP:'Intensive outpatient',OP:'Outpatient',Discharged:'Last 30 days'};
-const LOC_VAR={Pending:'--pend',PHP:'--php',IOP:'--iop',OP:'--op',Discharged:'--dc'};
-const RANK={Pending:0,PHP:1,IOP:2,OP:3,Discharged:4};
-const DEFAULT_DAYS={Pending:[],PHP:['mon','tue','wed','thu','fri'],IOP:['mon','wed','thu'],OP:['tue'],Discharged:[]};
+/* LOC carries the frequency: PC6 = partial care 6 days/wk, IOP4 = IOP 4 days/wk, EIOP = evening IOP. */
+const LEVELS=['PC6','PC5','IOP6','IOP5','IOP4','IOP3','EIOP','OP'];
+const LOCS=['Pending',...LEVELS,'Discharged'];
+const LOC_NAME=Object.fromEntries(LOCS.map(l=>[l,l]));
+const GROUPS=['PC','IOP','EIOP','OP'];
+const GROUP_SUB={PC:'partial care',IOP:'IOP3–IOP6',EIOP:'evening IOP',OP:'outpatient'};
+const group=l=>/^PC/.test(l)?'PC':/^IOP/.test(l)?'IOP':l;
+const GROUP_VAR={Pending:'--pend',PC:'--php',IOP:'--iop',EIOP:'--eiop',OP:'--op',Discharged:'--dc'};
+const RANK=Object.fromEntries(LOCS.map((l,i)=>[l,i]));
+const M6=['mon','tue','wed','thu','fri','sat'],M5=['mon','tue','wed','thu','fri'];
+const DEFAULT_DAYS={Pending:[],PC6:M6,PC5:M5,IOP6:M6,IOP5:M5,IOP4:['mon','tue','wed','thu'],IOP3:['mon','wed','thu'],EIOP:['mon','tue','thu'],OP:['tue'],Discharged:[]};
 const DEFAULT_LOS={PHP:21,IOP:28};
 const OP_TO_DC=42;
-const KEY='census-prototype-v2';
-const SESSIONS=['Day','Evening','Night'];
-const NEXT_LOC={Pending:'PHP',PHP:'IOP',IOP:'OP',OP:'Discharged'};
+const KEY='census-prototype-v3';
+const NEXT_LOC={Pending:'PC5',PC6:'IOP5',PC5:'IOP5',IOP6:'IOP3',IOP5:'IOP3',IOP4:'IOP3',IOP3:'OP',EIOP:'OP',OP:'Discharged'};
 
 /* ---------- dates ---------- */
 const pad=n=>String(n).padStart(2,'0');
@@ -290,7 +289,7 @@ const fmt=s=>{if(!s)return '—';const d=pISO(s);return `${pad(d.getMonth()+1)}/
 const wkday=s=>pISO(s).toLocaleDateString('en-US',{weekday:'short'});
 const dayKey=s=>['sun','mon','tue','wed','thu','fri','sat'][pISO(s).getDay()];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const cvar=loc=>`var(${LOC_VAR[loc]})`;
+const cvar=loc=>`var(${GROUP_VAR[group(loc)]||'--dc'})`;
 
 /* ---------- sample data (fictional) ---------- */
 const CLIN=['R. Patel, LCSW','M. Okafor, LPC','J. Lindqvist, LMFT','D. Ramos, LCADC'];
@@ -298,42 +297,42 @@ const CM=['T. Nguyen','K. Brooks','S. Haddad'];
 const APN=['L. Moreau, PMHNP','A. Castillo, PMHNP'];
 function sample(){
   const D=s=>s?s.split(' '):[];
-  const W='mon tue wed thu fri';
+  const W='mon tue wed thu fri', W6='mon tue wed thu fri sat';
   // name, loc, admit, stepDown, dc, days, clin, cm, apn, referral, commitDays, commitNote, housing, dischargedOn
   const rows=[
-    ['Jordan Ashby','Pending',1,null,null,'',0,1,0,'Inpatient psych unit',56,'PHP 3 wks, then IOP','LPD'],
-    ['Priya Desmond','Pending',2,null,null,'',2,0,1,'Detox center',84,'PHP 4 wks, IOP 4 wks, OP 4 wks','LPD'],
+    ['Jordan Ashby','Pending',1,null,null,'',0,1,0,'Inpatient psych unit',56,'PC 3 wks, then IOP','LPD'],
+    ['Priya Desmond','Pending',2,null,null,'',2,0,1,'Detox center',84,'PC 4 wks, IOP 4 wks, OP 4 wks','LPD'],
     ['Malik Torrance','Pending',6,null,null,'',1,2,0,'Outpatient therapist',42,'IOP 6 wks','Commuter'],
-    ['Avery Mendez','PHP',-16,3,40,W,0,0,0,'Inpatient psych unit',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
-    ['Casey Holloway','PHP',-23,0,30,W,1,1,1,'Detox center',84,'PHP 4 wks, IOP 4 wks, OP 4 wks','LPD'],
-    ['Noah Brandt','PHP',-9,12,52,W,2,2,0,'Hospital ED',56,'PHP 3 wks, IOP 5 wks','Commuter'],
-    ['Elena Ruiz','PHP',-4,17,60,W,3,0,1,'Self-referral',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
-    ['Theo Kaminski','PHP',-19,2,36,W,0,1,0,'Alumni referral',56,'PHP 3 wks, IOP 5 wks','Commuter'],
-    ['Imani Clarke','PHP',-12,9,49,W,1,2,1,'Inpatient psych unit',84,'PHP 4 wks, IOP 4 wks, OP 4 wks','LPD'],
-    ['Grace Whitfield','PHP',-2,19,55,W,2,0,0,'Family',56,'PHP 3 wks, IOP 5 wks','Commuter'],
-    ['Samir Haddock','IOP',-31,6,25,'mon wed thu',3,1,1,'Detox center',56,'PHP 3 wks, IOP 5 wks','LPD'],
-    ['Lucia Fontaine','IOP',-38,5,18,'tue wed fri',0,2,0,'EAP',56,'PHP 2 wks, IOP 6 wks','Commuter'],
-    ['Devon Pierce','IOP',-27,10,38,'mon wed thu',1,0,1,'Inpatient psych unit',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
-    ['Hannah Osei','IOP',-44,1,12,'mon tue thu',2,1,0,'Outpatient therapist',42,'IOP 6 wks','Commuter'],
-    ['Marcus Lyle','IOP',-20,15,44,'mon wed thu',3,2,1,'Self-referral',56,'IOP 8 wks','LPD'],
-    ['Rosa Delgado','IOP',-35,4,30,'tue wed fri',0,0,0,'Hospital ED',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
-    ['Wyatt Ferris','IOP',-14,21,50,'mon wed thu',1,1,1,'Alumni referral',56,'IOP 8 wks','Commuter'],
-    ['Nadia Vance','OP',-58,null,5,'tue',2,2,0,'Detox center',56,'PHP 3 wks, IOP 5 wks','Commuter'],
-    ['Oliver Grant','OP',-71,null,-2,'thu',3,0,1,'Inpatient psych unit',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
-    ['Simone Achebe','OP',-49,null,20,'tue',0,1,0,'EAP',84,'PHP 4 wks, IOP 4 wks, OP 4 wks','Commuter'],
-    ['Ben Okonkwo','OP',-64,null,13,'wed',1,2,1,'Family',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD'],
-    ['Riley Starr','Discharged',-60,null,-3,'',2,0,0,'Hospital ED',56,'PHP 3 wks, IOP 5 wks','Commuter',-3],
-    ['Frances Iwu','Discharged',-75,null,-8,'',3,1,1,'Detox center',70,'PHP 3 wks, IOP 4 wks, OP 3 wks','LPD',-8],
+    ['Avery Mendez','PC5',-16,3,40,W,0,0,0,'Inpatient psych unit',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Casey Holloway','PC6',-23,0,30,W6,1,1,1,'Detox center',84,'PC 4 wks, IOP 4 wks, OP 4 wks','LPD'],
+    ['Noah Brandt','PC5',-9,12,52,W,2,2,0,'Hospital ED',56,'PC 3 wks, IOP 5 wks','Commuter'],
+    ['Elena Ruiz','PC6',-4,17,60,W6,3,0,1,'Self-referral',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Theo Kaminski','PC5',-19,2,36,W,0,1,0,'Alumni referral',56,'PC 3 wks, IOP 5 wks','Commuter'],
+    ['Imani Clarke','PC5',-12,9,49,W,1,2,1,'Inpatient psych unit',84,'PC 4 wks, IOP 4 wks, OP 4 wks','LPD'],
+    ['Grace Whitfield','PC5',-2,19,55,W,2,0,0,'Family',56,'PC 3 wks, IOP 5 wks','Commuter'],
+    ['Samir Haddock','IOP3',-31,6,25,'mon wed thu',3,1,1,'Detox center',56,'PC 3 wks, IOP 5 wks','LPD'],
+    ['Lucia Fontaine','EIOP',-38,5,18,'mon tue thu',0,2,0,'EAP',56,'PC 2 wks, IOP 6 wks','Commuter'],
+    ['Devon Pierce','IOP5',-27,10,38,W,1,0,1,'Inpatient psych unit',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Hannah Osei','IOP4',-44,1,12,'mon tue wed thu',2,1,0,'Outpatient therapist',42,'IOP 6 wks','Commuter'],
+    ['Marcus Lyle','EIOP',-20,15,44,'mon tue thu',3,2,1,'Self-referral',56,'IOP 8 wks','LPD'],
+    ['Rosa Delgado','IOP3',-35,4,30,'tue wed fri',0,0,0,'Hospital ED',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Wyatt Ferris','IOP6',-14,21,50,W6,1,1,1,'Alumni referral',56,'IOP 8 wks','Commuter'],
+    ['Nadia Vance','OP',-58,null,5,'tue',2,2,0,'Detox center',56,'PC 3 wks, IOP 5 wks','Commuter'],
+    ['Oliver Grant','OP',-71,null,-2,'thu',3,0,1,'Inpatient psych unit',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Simone Achebe','OP',-49,null,20,'tue',0,1,0,'EAP',84,'PC 4 wks, IOP 4 wks, OP 4 wks','Commuter'],
+    ['Ben Okonkwo','OP',-64,null,13,'wed',1,2,1,'Family',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
+    ['Riley Starr','Discharged',-60,null,-3,'',2,0,0,'Hospital ED',56,'PC 3 wks, IOP 5 wks','Commuter',-3],
+    ['Frances Iwu','Discharged',-75,null,-8,'',3,1,1,'Detox center',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD',-8],
     ['Quinn Albright','Discharged',-40,null,-14,'',0,2,0,'Self-referral',42,'IOP 6 wks','Commuter',-14],
   ];
-  const SES={'Malik Torrance':'Evening','Noah Brandt':'Evening','Lucia Fontaine':'Evening','Hannah Osei':'Evening','Wyatt Ferris':'Evening','Marcus Lyle':'Night','Samir Haddock':'Night','Nadia Vance':'Evening','Simone Achebe':'Night','Ben Okonkwo':'Evening','Riley Starr':'Evening','Quinn Albright':'Night'};
-  const LATER={'Avery Mendez':['OP',31,'Evening',['tue']],'Imani Clarke':['OP',37,'Evening',['thu']],'Elena Ruiz':['OP',45,'Night',['wed']]};
+  const FIRST={'Elena Ruiz':'PC5','Casey Holloway':'IOP5','Noah Brandt':'EIOP','Grace Whitfield':'IOP5'};
+  const LATER={'Avery Mendez':[['IOP3',17],['OP',31]],'Imani Clarke':[['IOP3',23],['OP',37]],'Elena Ruiz':[['IOP5',31],['IOP3',45]],'Devon Pierce':[['OP',24]]};
   return rows.map((r,i)=>{
-    const ses=SES[r[0]]||'Day', plans=[];
-    if(r[3]!=null){const to=NEXT_LOC[r[1]];plans.push({date:addDays(TODAY,r[3]),loc:to,session:r[1]==='PHP'&&ses==='Day'?'Day':ses,days:[...DEFAULT_DAYS[to]]})}
-    if(LATER[r[0]]){const[l,o,se,d]=LATER[r[0]];plans.push({date:addDays(TODAY,o),loc:l,session:se,days:d})}
+    const plans=[];
+    if(r[3]!=null){const to=FIRST[r[0]]||NEXT_LOC[r[1]];plans.push({date:addDays(TODAY,r[3]),loc:to,days:[...DEFAULT_DAYS[to]]})}
+    (LATER[r[0]]||[]).forEach(([l,o])=>plans.push({date:addDays(TODAY,o),loc:l,days:[...DEFAULT_DAYS[l]]}));
     return {
-    id:'c'+(i+1), name:r[0], loc:r[1], session:ses, plans, admitDate:addDays(TODAY,r[2]),
+    id:'c'+(i+1), name:r[0], loc:r[1], plans, admitDate:addDays(TODAY,r[2]),
     dcDate:r[4]==null?'':addDays(TODAY,r[4]),
     days:D(r[5]), clinician:CLIN[r[6]], caseManager:CM[r[7]], psychApn:APN[r[8]],
     referral:r[9], commitDays:r[10], commitNote:r[11], housing:r[12],
@@ -365,7 +364,7 @@ function flags(c){
   if(c.loc==='Discharged')return f;
   const np=nextPlan(c);
   if(np){const d=diff(TODAY,np.date);if(d<=3)f.push({lvl:'warn',text:d<=1?`Moves to ${np.loc} tomorrow`:`Moves to ${np.loc} in ${d}d`})}
-  else if(c.loc==='PHP'||c.loc==='IOP')f.push({lvl:'info',text:'No step-down scheduled'});
+  else if(group(c.loc)!=='OP')f.push({lvl:'info',text:'No step-down scheduled'});
   if(c.dcDate){const d=diff(TODAY,c.dcDate);
     if(d<0)f.push({lvl:'crit',text:`DC ${-d}d overdue`});else if(d<=7)f.push({lvl:'warn',text:d===0?'DC today':`DC in ${d}d`})}
   if(c.commitDays&&losDays(c)>c.commitDays)f.push({lvl:'warn',text:'Past incoming commitment'});
@@ -407,18 +406,14 @@ function moveLoc(id,to){
   save();render();
   toast(`${c.name} ${verb}. ${msg.join(' ')}`,true);
 }
-function moveDay(id,fromDay,toDay,toSes){
-  const c=byId(id);if(!c)return;
-  const dayChange=fromDay!==toDay, sesChange=!!toSes&&toSes!==c.session;
-  if(!dayChange&&!sesChange)return;
-  if(dayChange&&c.days.includes(toDay)){toast(`${c.name} is already scheduled on ${DAY_LABEL[toDay]}.`);return}
+function moveDay(id,fromDay,toDay){
+  const c=byId(id);if(!c||fromDay===toDay)return;
+  if(c.days.includes(toDay)){toast(`${c.name} is already scheduled on ${DAY_LABEL[toDay]}.`);return}
   snap();
-  if(dayChange)c.days=c.days.map(d=>d===fromDay?toDay:d).sort((a,b)=>DAYS.indexOf(a)-DAYS.indexOf(b));
-  if(sesChange)c.session=toSes;
-  const parts=[];if(dayChange)parts.push(`${DAY_LABEL[fromDay]} moved to ${DAY_LABEL[toDay]}`);if(sesChange)parts.push(`now attends ${toSes.toLowerCase()} sessions`);
-  c.history.push({date:TODAY,text:`Schedule: ${parts.join(', ')}`});
+  c.days=c.days.map(d=>d===fromDay?toDay:d).sort((a,b)=>DAYS.indexOf(a)-DAYS.indexOf(b));
+  c.history.push({date:TODAY,text:`Schedule: ${DAY_LABEL[fromDay]} moved to ${DAY_LABEL[toDay]}`});
   save();render();
-  toast(`${c.name}: ${parts.join(', ')}${sesChange?' (all of their days)':''}.`,true);
+  toast(`${c.name} moved from ${DAY_LABEL[fromDay]} to ${DAY_LABEL[toDay]}.`,true);
 }
 /* Scheduled LOC changes: on or after each entry's date, apply it automatically. */
 function runScheduled(){
@@ -432,10 +427,9 @@ function runScheduled(){
       else{
         if(from==='Pending'||from==='Discharged'){c.admitDate=p.date;c.dischargedOn=''}
         c.days=p.days&&p.days.length?[...p.days]:[...DEFAULT_DAYS[p.loc]];
-        c.session=p.session||c.session;
         if(p.loc==='OP'&&(!c.dcDate||c.dcDate<p.date))c.dcDate=addDays(p.date,OP_TO_DC);
       }
-      c.history.push({date:p.date,text:`Auto-updated per schedule: ${from} → ${p.loc}${p.loc!=='Discharged'?` · ${c.session} · ${freq(c)}`:''}`});
+      c.history.push({date:p.date,text:`Auto-updated per schedule: ${from} → ${p.loc}${p.loc!=='Discharged'?` · ${daysText(c.days)}`:''}`});
       done.push(`${c.name} → ${p.loc}`);
     }
   });
@@ -449,16 +443,14 @@ let view='census', sort={k:'loc',dir:1}, openId=null;
 
 function renderStats(){
   const act=state.clients.filter(c=>LEVELS.includes(c.loc));
-  const n=l=>state.clients.filter(c=>c.loc===l).length;
+  const n=l=>state.clients.filter(c=>group(c.loc)===l).length;
   const lpd=act.filter(c=>c.housing==='LPD').length;
   const tk=dayKey(TODAY), todayCount=act.filter(c=>c.days.includes(tk)).length;
   const attn=state.clients.filter(c=>recentDc(c)&&flags(c).some(f=>f.lvl!=='info')).length;
   const st=(k,v,s,cls='',sw='')=>`<div class="stat ${cls}"><div class="k">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   $('#stats').innerHTML=
-    st('Active census',act.length,'PHP + IOP + OP')+
-    st('PHP',n('PHP'),'partial hosp.','',cvar('PHP'))+
-    st('IOP',n('IOP'),'intensive outpt.','',cvar('IOP'))+
-    st('OP',n('OP'),'outpatient','',cvar('OP'))+
+    st('Active census',act.length,'all levels of care')+
+    GROUPS.map(g=>st(g,n(g),GROUP_SUB[g],'',`var(${GROUP_VAR[g]})`)).join('')+
     st('Pending',n('Pending'),'incoming admits','',cvar('Pending'))+
     st('LPD',lpd,`${act.length-lpd} commuters`)+
     st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
@@ -483,32 +475,31 @@ function renderAttention(list){
 function weekDates(){const d=pISO(TODAY);const dow=(d.getDay()+6)%7;const mon=addDays(TODAY,-dow);return DAYS.map((k,i)=>({k,date:addDays(mon,i)}))}
 function renderSchedule(){
   const list=state.clients.filter(c=>LEVELS.includes(c.loc)&&visible(c));
-  const legend=`<div class="legend">${LEVELS.map(l=>`<span><span class="swatch" style="background:${cvar(l)}"></span>${l}</span>`).join('')}<span>Drag a name to another day or session to change that client's schedule. Click a name for details.</span></div>`;
+  const legend=`<div class="legend">${GROUPS.map(g=>`<span><span class="swatch" style="background:var(${GROUP_VAR[g]})"></span>${g}</span>`).join('')}<span>Drag a name to another day to change that client's schedule. Click a name for details.</span></div>`;
   const cols=weekDates().map(({k,date})=>{
     const cs=list.filter(c=>c.days.includes(k)).sort((a,b)=>RANK[a.loc]-RANK[b.loc]||a.name.localeCompare(b.name));
-    const by=l=>cs.filter(c=>c.loc===l).length, lpd=cs.filter(c=>c.housing==='LPD').length;
-    const mix=cs.length?LEVELS.map(l=>`<span style="width:${by(l)/cs.length*100}%;background:${cvar(l)}"></span>`).join(''):'';
-    return `<section class="day ${date===TODAY?'today':''}" aria-label="${DAY_LABEL[k]}">
+    const by=g=>cs.filter(c=>group(c.loc)===g).length, lpd=cs.filter(c=>c.housing==='LPD').length;
+    const mix=cs.length?GROUPS.map(g=>`<span style="width:${by(g)/cs.length*100}%;background:var(${GROUP_VAR[g]})"></span>`).join(''):'';
+    return `<section class="day ${date===TODAY?'today':''}" data-drop="day" data-day="${k}" aria-label="${DAY_LABEL[k]}">
       <div class="day-h"><span class="dn">${DAY_LABEL[k]}</span><span class="dd">${fmt(date)}${date===TODAY?' · today':''}</span>
-        <div class="cnt"><b>${cs.length}</b> expected · ${LEVELS.map(l=>`${l} ${by(l)}`).join(' · ')} · LPD ${lpd}</div>
+        <div class="cnt"><b>${cs.length}</b> expected · ${GROUPS.map(g=>`${g} ${by(g)}`).join(' · ')} · LPD ${lpd}</div>
         <div class="mix">${mix}</div></div>
-      ${SESSIONS.map(se=>{const ss=cs.filter(c=>c.session===se);return `<div class="ses" data-drop="day" data-day="${k}" data-session="${se}"><div class="ses-h">${se} <span>${ss.length}</span></div>
-        ${ss.map(c=>`<button class="chip" style="--c:${cvar(c.loc)}" data-drag="sched" data-id="${c.id}" data-day="${k}"><span class="dot"></span>${esc(c.name)}${c.housing==='LPD'?'<span class="h">LPD</span>':''}<span class="lv">${c.loc}</span></button>`).join('')}</div>`}).join('')}
+      ${cs.map(c=>`<button class="chip" style="--c:${cvar(c.loc)}" data-drag="sched" data-id="${c.id}" data-day="${k}"><span class="dot"></span>${esc(c.name)}${c.housing==='LPD'?'<span class="h">LPD</span>':''}<span class="lv">${c.loc}</span></button>`).join('')}
     </section>`;
   }).join('');
   return legend+`<div class="week">${cols}</div>`;
 }
 const COLS=[
   ['name','Client',c=>c.name],['alert','Alerts',c=>{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return f.length?sev[f[0].lvl]:9}],
-  ['loc','LOC',c=>c.loc],['session','Session',c=>SESSIONS.indexOf(c.session)],['housing','Housing',c=>c.housing],
+  ['loc','LOC',c=>c.loc],['housing','Housing',c=>c.housing],
   ['admitDate','Admitted',c=>c.admitDate],['los','Day #',c=>losDays(c)||''],
   ['stepDown','Proj. step-down',c=>nextPlan(c)?.date||'9'],['dcDate','Proj. DC',c=>c.dcDate],
-  ['freq','Freq.',c=>c.days.length],['days','Schedule',c=>c.days.map(d=>DAYS.indexOf(d)).join('')],
+  ['days','Schedule',c=>c.days.map(d=>DAYS.indexOf(d)).join('')],
   ['clinician','Clinician',c=>c.clinician],['caseManager','Case manager',c=>c.caseManager],['psychApn','Psych APN',c=>c.psychApn],
   ['referral','Referral source',c=>c.referral],['commit','Incoming commitment',c=>c.commitDays||0],
 ];
 function sortedRows(){
-  const list=state.clients.filter(c=>visible(c)&&recentDc(c)&&(!F.loc||c.loc===F.loc));
+  const list=state.clients.filter(c=>visible(c)&&recentDc(c)&&(!F.loc||group(c.loc)===F.loc));
   const col=COLS.find(x=>x[0]===sort.k);
   const val=c=>sort.k==='loc'?RANK[c.loc]:col[2](c);
   return list.sort((a,b)=>{const x=val(a),y=val(b);return (x>y?1:x<y?-1:a.name.localeCompare(b.name))*sort.dir});
@@ -523,9 +514,7 @@ function cell(c,k){
     case 'los':return `<td class="mono">${losDays(c)?losDays(c)+(c.commitDays?`<span class="of">/${c.commitDays}</span>`:''):'—'}</td>`;
     case 'stepDown':{if(c.loc==='Discharged')return '<td><span class="of">n/a</span></td>';const np=nextPlan(c);
       return `<td><button class="plan-link" data-plan="${c.id}" title="Schedule LOC changes">${np?`<span class="mono">${fmt(np.date)}</span> → <b style="color:${cvar(np.loc)}">${np.loc==='Discharged'?'DC':np.loc}</b>${c.plans.length>1?` <span class="of">+${c.plans.length-1}</span>`:''}`:'<span class="add">+ Schedule</span>'}</button></td>`}
-    case 'session':return LEVELS.includes(c.loc)||c.loc==='Pending'?`<td><select class="s-sel" data-row-session="${c.id}" aria-label="Session for ${esc(c.name)}">${SESSIONS.map(x=>`<option ${x===c.session?'selected':''}>${x}</option>`).join('')}</select></td>`:'<td>—</td>';
     case 'dcDate':return `<td class="mono">${c.loc==='Discharged'?`DC'd ${fmt(c.dischargedOn)}`:fmt(c.dcDate)}</td>`;
-    case 'freq':return `<td>${freq(c)}</td>`;
     case 'days':return `<td>${LEVELS.includes(c.loc)?daysDots(c):'—'}</td>`;
     case 'commit':return `<td>${esc(c.commitNote)||'—'}</td>`;
     default:return `<td>${esc(c[k])||'—'}</td>`;
@@ -533,8 +522,8 @@ function cell(c,k){
 }
 function renderCensus(){
   const rows=sortedRows();
-  const n=l=>state.clients.filter(c=>c.loc===l&&visible(c)&&recentDc(c)).length;
-  const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['',...LOCS].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l?cvar(l):'var(--accent)'}">${l?LOC_NAME[l]:'All'} <span>${l?n(l):state.clients.filter(c=>visible(c)&&recentDc(c)).length}</span></button>`).join('')}</div>`;
+  const n=l=>state.clients.filter(c=>group(c.loc)===l&&visible(c)&&recentDc(c)).length;
+  const chips=`<div class="locfilter" role="group" aria-label="Show level of care">${['','Pending',...GROUPS,'Discharged'].map(l=>`<button data-locf="${l}" aria-pressed="${F.loc===l}" style="--c:${l?cvar(l):'var(--accent)'}">${l||'All'} <span>${l?n(l):state.clients.filter(c=>visible(c)&&recentDc(c)).length}</span></button>`).join('')}</div>`;
   return renderAttention(state.clients.filter(visible))+`<div class="tbar">${chips}<p>Change LOC right in the row. Click a name for full details.</p>
     <button class="btn small" id="btn-copy">Copy as spreadsheet (CSV)</button></div>
   <div class="tablewrap"><table class="census"><thead><tr>${COLS.map(([k,l])=>`<th data-sort="${k}" ${sort.k===k?`aria-sort="${sort.dir>0?'ascending':'descending'}"`:''}>${l}${sort.k===k?(sort.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
@@ -571,8 +560,7 @@ function renderDrawer(){
         <div class="fld"><span class="lbl">Projected step-down</span>${c.loc==='Discharged'?'<span class="of">n/a</span>':`<button type="button" class="plan-link boxed" data-plan="${c.id}">${nextPlan(c)?`${fmt(nextPlan(c).date)} → ${nextPlan(c).loc}${c.plans.length>1?` (+${c.plans.length-1})`:''}`:'+ Schedule a change'}</button>`}</div>
         <div class="fld"><label for="d-dc">Projected DC</label><input id="d-dc" type="date" data-f="dcDate" value="${c.dcDate}"></div>
         ${c.loc==='Discharged'?`<div class="fld"><label for="d-dco">Discharged on</label><input id="d-dco" type="date" data-f="dischargedOn" value="${c.dischargedOn}"></div>`:''}
-        <div class="fld full"><span class="lbl">Session</span><div class="seg">${SESSIONS.map(x=>`<button type="button" data-session="${x}" aria-pressed="${c.session===x}">${x}</button>`).join('')}</div></div>
-        <div class="fld full"><span class="lbl">Attendance schedule · ${freq(c)}</span><div class="daypick">${DAYS.map(d=>`<button type="button" data-day-toggle="${d}" aria-pressed="${c.days.includes(d)}">${DAY_LABEL[d]}</button>`).join('')}</div></div>
+        <div class="fld full"><span class="lbl">Attendance days · ${freq(c)}</span><div class="daypick">${DAYS.map(d=>`<button type="button" data-day-toggle="${d}" aria-pressed="${c.days.includes(d)}">${DAY_LABEL[d]}</button>`).join('')}</div></div>
       </div>
       <div class="sec-h">Care team</div>
       <div class="grid2">
@@ -605,9 +593,8 @@ function setField(c,f,v){
 }
 document.addEventListener('change',e=>{
   const c=byId(openId);
-  if(e.target.matches('[data-row-session]')){const r=byId(e.target.dataset.rowSession);snap();r.session=e.target.value;r.history.push({date:TODAY,text:`Session changed to ${r.session}`});save();render();toast(`${r.name} now attends ${r.session.toLowerCase()} sessions.`,true);return}
   if(e.target.matches('[data-pf]')){const i=+e.target.dataset.p,k=e.target.dataset.pf,pl=planDraft[i];pl[k]=e.target.value;
-    if(k==='loc'&&pl.loc&&pl.loc!=='Discharged'&&!pl.days.length)pl.days=[...DEFAULT_DAYS[pl.loc]];
+    if(k==='loc'&&pl.loc&&pl.loc!=='Discharged')pl.days=[...DEFAULT_DAYS[pl.loc]];
     if(k!=='date')renderPlanner();return}
   if(e.target.matches('[data-row-loc]')){moveLoc(e.target.dataset.rowLoc,e.target.value);return}
   if(e.target.matches('[data-row-house]')){const r=byId(e.target.dataset.rowHouse);snap();r.housing=e.target.value;r.history.push({date:TODAY,text:`Housing changed to ${r.housing}`});save();render();toast(`${r.name} now marked ${r.housing}.`,true);return}
@@ -632,7 +619,7 @@ function openPlanner(id){
   const c=byId(id);if(!c)return;
   planReturn=openId;openId=null;planFor=id;
   const ps=(c.plans||[]).slice().sort((a,b)=>a.date.localeCompare(b.date));
-  planDraft=[0,1,2].map(i=>ps[i]?{...ps[i],days:[...(ps[i].days||[])]}:{date:'',loc:'',days:[],session:c.session});
+  planDraft=[0,1,2].map(i=>ps[i]?{...ps[i],days:[...(ps[i].days||[])]}:{date:'',loc:'',days:[]});
   renderPlanner();
   setTimeout(()=>$('#p0-date')?.focus(),0);
 }
@@ -643,15 +630,14 @@ function renderPlanner(){
   $('#layer').innerHTML=`<div class="scrim" data-close></div>
   <div class="modal planner" role="dialog" aria-label="Scheduled changes for ${esc(c.name)}">
     <h2>Scheduled changes · ${esc(c.name)}</h2>
-    <p>On each date, this client's LOC, session and frequency update automatically. You can line up to 3 changes.</p>
-    <div class="now" style="--c:${cvar(c.loc)}"><span class="lbl">Now</span><b>${LOC_NAME[c.loc]}</b>${LEVELS.includes(c.loc)?` · ${c.session} · ${freq(c)} ${daysDots(c)}`:''}</div>
+    <p>On each date, this client's LOC and attendance days update automatically. You can line up to 3 changes.</p>
+    <div class="now" style="--c:${cvar(c.loc)}"><span class="lbl">Now</span><b>${LOC_NAME[c.loc]}</b>${LEVELS.includes(c.loc)?` · ${daysDots(c)}`:''}</div>
     ${planDraft.map((p,i)=>`<fieldset class="slot" style="--c:${p.loc?cvar(p.loc):'var(--accent)'}"><legend>Change ${i+1}</legend>
       <div class="slot-g">
         <div class="fld"><label for="p${i}-date">On this date</label><input type="date" id="p${i}-date" data-p="${i}" data-pf="date" value="${p.date}"></div>
-        <div class="fld"><label for="p${i}-loc">Change LOC to</label><select id="p${i}-loc" data-p="${i}" data-pf="loc"><option value="">Choose…</option>${['PHP','IOP','OP','Discharged'].map(l=>`<option value="${l}" ${p.loc===l?'selected':''}>${l}</option>`).join('')}</select></div>
-        <div class="fld"><label for="p${i}-ses">Session</label><select id="p${i}-ses" data-p="${i}" data-pf="session" ${p.loc==='Discharged'?'disabled':''}>${SESSIONS.map(x=>`<option ${p.session===x?'selected':''}>${x}</option>`).join('')}</select></div>
+        <div class="fld"><label for="p${i}-loc">Change LOC to</label><select id="p${i}-loc" data-p="${i}" data-pf="loc"><option value="">Choose…</option>${[...LEVELS,'Discharged'].map(l=>`<option value="${l}" ${p.loc===l?'selected':''}>${l}</option>`).join('')}</select></div>
       </div>
-      ${p.loc&&p.loc!=='Discharged'?`<div class="fld"><span class="lbl">Frequency · ${p.days.length}x/wk</span><div class="daypick">${DAYS.map(d=>`<button type="button" data-pday="${i}" data-d="${d}" aria-pressed="${p.days.includes(d)}">${DAY_LABEL[d]}</button>`).join('')}</div></div>`:''}
+      ${p.loc&&p.loc!=='Discharged'?`<div class="fld"><span class="lbl">Attendance days · ${p.days.length}x/wk</span><div class="daypick">${DAYS.map(d=>`<button type="button" data-pday="${i}" data-d="${d}" aria-pressed="${p.days.includes(d)}">${DAY_LABEL[d]}</button>`).join('')}</div></div>`:''}
       ${p.date||p.loc?`<div><button type="button" class="btn small" data-pclear="${i}">Clear this change</button></div>`:''}
     </fieldset>`).join('')}
     <p id="plan-err" class="err" role="alert">${esc(err)}</p>
@@ -669,7 +655,7 @@ function savePlanner(){
   if(used.some(p=>p.date<TODAY))return bad('Dates must be today or later.');
   const dates=used.map(p=>p.date);if(new Set(dates).size!==dates.length)return bad('Two changes have the same date. Give each its own date.');
   snap();
-  c.plans=used.map(p=>({date:p.date,loc:p.loc,session:p.loc==='Discharged'?'':p.session,days:p.loc==='Discharged'?[]:[...p.days]})).sort((a,b)=>a.date.localeCompare(b.date));
+  c.plans=used.map(p=>({date:p.date,loc:p.loc,days:p.loc==='Discharged'?[]:[...p.days]})).sort((a,b)=>a.date.localeCompare(b.date));
   c.history.push({date:TODAY,text:c.plans.length?`Scheduled: ${c.plans.map(p=>`${fmt(p.date)} → ${p.loc}`).join(', ')}`:'Scheduled changes cleared'});
   const done=runScheduled();save();
   closeLayerOrPlanner();render();
@@ -688,9 +674,8 @@ document.addEventListener('click',e=>{
   const pl=t.closest('[data-plan]');if(pl){openPlanner(pl.dataset.plan);return}
   if(t.closest('[data-pday]')){const b=t.closest('[data-pday]'),p=planDraft[+b.dataset.pday],d=b.dataset.d;
     p.days=p.days.includes(d)?p.days.filter(x=>x!==d):[...p.days,d].sort((a,b)=>DAYS.indexOf(a)-DAYS.indexOf(b));renderPlanner();return}
-  if(t.closest('[data-pclear]')){const i=+t.closest('[data-pclear]').dataset.pclear;planDraft[i]={date:'',loc:'',days:[],session:byId(planFor).session};renderPlanner();return}
+  if(t.closest('[data-pclear]')){const i=+t.closest('[data-pclear]').dataset.pclear;planDraft[i]={date:'',loc:'',days:[]};renderPlanner();return}
   if(t.id==='plan-save'){savePlanner();return}
-  if(t.closest('[data-session]')&&c){c.session=t.closest('[data-session]').dataset.session;c.history.push({date:TODAY,text:`Session changed to ${c.session}`});save();render();return}
   const opener=t.closest('[data-open],[data-drag]');
   if(opener&&!t.closest('.drawer')&&!t.closest('.modal')){openClient(opener.dataset.open||opener.dataset.id);return}
   const th=t.closest('th[data-sort]');
@@ -710,7 +695,7 @@ document.addEventListener('keydown',e=>{
 });
 $('#btn-add').addEventListener('click',()=>{
   snap();const id='n'+(state.seq++);
-  state.clients.push({id,name:'New client',loc:'Pending',session:'Day',plans:[],admitDate:addDays(TODAY,1),dcDate:'',days:[],clinician:CLIN[0],caseManager:CM[0],psychApn:APN[0],referral:'',commitDays:0,commitNote:'',housing:'Commuter',dischargedOn:'',history:[{date:TODAY,text:'Referral entered'}]});
+  state.clients.push({id,name:'New client',loc:'Pending',plans:[],admitDate:addDays(TODAY,1),dcDate:'',days:[],clinician:CLIN[0],caseManager:CM[0],psychApn:APN[0],referral:'',commitDays:0,commitNote:'',housing:'Commuter',dischargedOn:'',history:[{date:TODAY,text:'Referral entered'}]});
   save();if(view!=='census')location.hash='#census';render();openClient(id);
   setTimeout(()=>{const n=$('#d-name');n?.focus();n?.select()},10);
 });
@@ -769,7 +754,7 @@ function endDrag(drop){
     drag=null;
     if(drop&&d.target){
       if(d.el.dataset.drag==='client')moveLoc(d.el.dataset.id,d.target.dataset.loc);
-      else moveDay(d.el.dataset.id,d.el.dataset.day,d.target.dataset.day,d.target.dataset.session);
+      else moveDay(d.el.dataset.id,d.el.dataset.day,d.target.dataset.day);
     }
   }else drag=null;
 }
@@ -779,9 +764,9 @@ document.addEventListener('contextmenu',e=>{if(drag&&drag.touch)e.preventDefault
 
 /* ---------- CSV export ---------- */
 function toCsv(){
-  const head=['Client name','Admission date','Projected step-down date','Next LOC','Projected DC date','LOC','Session','Frequency','Attendance schedule','Clinician','Case manager','Psych APN','Referral source','Incoming commitment','Commitment days','Housing'];
+  const head=['Client name','Admission date','Projected step-down date','Next LOC','Projected DC date','LOC','Attendance days','Clinician','Case manager','Psych APN','Referral source','Incoming commitment','Commitment days','Housing'];
   const q=v=>{v=String(v??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v};
-  const rows=state.clients.map(c=>[c.name,fmt(c.admitDate).replace('—',''),nextPlan(c)?fmt(nextPlan(c).date):'',nextPlan(c)?.loc||'',fmt(c.dcDate).replace('—',''),c.loc,c.session,freq(c),c.days.map(d=>DAY_LABEL[d]).join(' '),c.clinician,c.caseManager,c.psychApn,c.referral,c.commitNote,c.commitDays||'',c.housing]);
+  const rows=state.clients.map(c=>[c.name,fmt(c.admitDate).replace('—',''),nextPlan(c)?fmt(nextPlan(c).date):'',nextPlan(c)?.loc||'',fmt(c.dcDate).replace('—',''),c.loc,c.days.map(d=>DAY_LABEL[d]).join(' '),c.clinician,c.caseManager,c.psychApn,c.referral,c.commitNote,c.commitDays||'',c.housing]);
   return [head,...rows].map(r=>r.map(q).join(',')).join('\n');
 }
 function copyCsv(btn){
@@ -806,7 +791,7 @@ function parseCsv(text){
   if(cell||row.length){row.push(cell);rows.push(row)}
   return rows.filter(r=>r.some(x=>String(x).trim()));
 }
-const FIELD_LABEL={name:'Client name',admitDate:'Admission date',stepDown:'Projected step-down',dcDate:'Projected DC',loc:'LOC',freq:'Frequency',days:'Schedule',session:'Session',clinician:'Clinician',caseManager:'Case manager',psychApn:'Psych APN',referral:'Referral source',commit:'Incoming commitment',housing:'Housing (LPD/commuter)'};
+const FIELD_LABEL={name:'Client name',admitDate:'Admission date',stepDown:'Projected step-down',dcDate:'Projected DC',loc:'LOC',freq:'Frequency',days:'Schedule',clinician:'Clinician',caseManager:'Case manager',psychApn:'Psych APN',referral:'Referral source',commit:'Incoming commitment',housing:'Housing (LPD/commuter)'};
 function matchHeader(h){
   const s=String(h).toLowerCase().replace(/[^a-z]/g,'');
   if(!s)return null;
@@ -815,7 +800,6 @@ function matchHeader(h){
   if(/admi|start/.test(s))return 'admitDate';
   if(/freq/.test(s))return 'freq';
   if(/sched|days/.test(s))return 'days';
-  if(/sess|shift|track|timeofday/.test(s))return 'session';
   if(/case|^cm/.test(s))return 'caseManager';
   if(/psych|apn|prescrib|np$/.test(s))return 'psychApn';
   if(/clinician|therapist|primary/.test(s))return 'clinician';
@@ -835,14 +819,20 @@ function parseDate(v){
   if(m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/)){let y=+m[3];if(y<100)y+=2000;return `${y}-${pad(m[1])}-${pad(m[2])}`}
   const d=new Date(s);return isNaN(d)?'':iso(d);
 }
-function parseLoc(v){const s=String(v||'').toLowerCase();
-  if(/php|partial/.test(s))return 'PHP';if(/iop|intensive/.test(s))return 'IOP';
+function parseLoc(v,fq){const s=String(v||'').toLowerCase().replace(/\s+/g,'');
+  const n=+((s.match(/(\d)/)||String(fq||'').match(/(\d)/)||[])[1]||0);
+  if(/eiop|evening/.test(s))return 'EIOP';
+  if(/^pc|php|partial/.test(s))return n===6?'PC6':'PC5';
+  if(/iop|intensive/.test(s))return n>=3&&n<=6?'IOP'+n:'IOP3';
   if(/disch|^dc/.test(s))return 'Discharged';if(/pend|refer|wait|incoming/.test(s))return 'Pending';
   if(/op|outpat/.test(s))return 'OP';return ''}
 function parseDays(v,loc){
   const s=String(v||'').toLowerCase();
-  if(/m\s*-\s*f|mon\w*\s*-\s*fri|daily|weekdays/.test(s))return ['mon','tue','wed','thu','fri'];
+  if(/daily|weekdays/.test(s))return ['mon','tue','wed','thu','fri'];
   const map={mon:'mon',m:'mon',tue:'tue',tues:'tue',tu:'tue',t:'tue',wed:'wed',w:'wed',thu:'thu',thur:'thu',thurs:'thu',th:'thu',r:'thu',fri:'fri',f:'fri',sat:'sat',sa:'sat',s:'sat'};
+  const tok=x=>map[(x.match(/mon|tues?|wed|thur?s?|fri|sat|th|tu|sa|m|t|w|r|f|s/)||[])[0]];
+  const rg=s.match(/^\s*([a-z]+)\s*[-–]\s*([a-z]+)\s*$/);
+  if(rg&&tok(rg[1])&&tok(rg[2])){const i=DAYS.indexOf(tok(rg[1])),j=DAYS.indexOf(tok(rg[2]));if(i<=j)return DAYS.slice(i,j+1)}
   const out=new Set();(s.match(/mon|tues?|wed|thur?s?|fri|sat|th|tu|sa|m|t|w|r|f|s/g)||[]).forEach(t=>map[t]&&out.add(map[t]));
   const d=[...out].sort((a,b)=>DAYS.indexOf(a)-DAYS.indexOf(b));
   return d.length?d:[...(DEFAULT_DAYS[loc]||[])];
@@ -873,13 +863,12 @@ function previewRows(rows){
   if(!map.includes('name')){box.innerHTML='<p class="err">I couldn\'t find a client name column. Add a heading like "Client name" to the first row.</p>';return}
   const clients=rows.slice(1).map((r,i)=>{
     const g=k=>{const ix=map.indexOf(k);return ix<0?'':r[ix]};
-    const loc=parseLoc(g('loc'))||'Pending';
+    const loc=parseLoc(g('loc'),g('freq'))||'Pending';
     const cm=parseCommit(g('commit'));
     const name=String(g('name')||'').trim();if(!name)return null;
-    const sesv=String(g('session')).toLowerCase(), session=/night|overnight/.test(sesv)?'Night':/eve|pm/.test(sesv)?'Evening':'Day';
     const sd=parseDate(g('stepDown')), to=NEXT_LOC[loc];
-    const plans=sd&&to&&loc!=='Discharged'?[{date:sd,loc:to,session,days:[...(DEFAULT_DAYS[to]||[])]}]:[];
-    return {id:'i'+(state.seq++),name,loc,session,plans,admitDate:parseDate(g('admitDate')),dcDate:parseDate(g('dcDate')),
+    const plans=sd&&to&&loc!=='Discharged'?[{date:sd,loc:to,days:[...(DEFAULT_DAYS[to]||[])]}]:[];
+    return {id:'i'+(state.seq++),name,loc,plans,admitDate:parseDate(g('admitDate')),dcDate:parseDate(g('dcDate')),
       days:LEVELS.includes(loc)?parseDays(g('days'),loc):[],clinician:String(g('clinician')||'').trim(),caseManager:String(g('caseManager')||'').trim(),psychApn:String(g('psychApn')||'').trim(),
       referral:String(g('referral')||'').trim(),...cm,housing:/lpd|resid|sober|house|yes/i.test(String(g('housing')))?'LPD':'Commuter',
       dischargedOn:loc==='Discharged'?(parseDate(g('dcDate'))||TODAY):'',history:[{date:TODAY,text:'Imported from spreadsheet'}]};
@@ -888,8 +877,8 @@ function previewRows(rows){
   const found=Object.keys(FIELD_LABEL).filter(k=>map.includes(k)), missing=Object.keys(FIELD_LABEL).filter(k=>!map.includes(k)&&k!=='freq');
   box.innerHTML=`<p><b style="color:var(--ink)">${clients.length} clients found.</b> Columns matched:</p>
     <div class="maplist">${found.map(k=>`<span>${FIELD_LABEL[k]}</span>`).join('')}${missing.map(k=>`<span class="miss">No ${FIELD_LABEL[k]}</span>`).join('')}</div>
-    <div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>Client</th><th>LOC</th><th>Admitted</th><th>Session</th><th>Schedule</th><th>Step-down</th><th>Clinician</th><th>Housing</th></tr></thead>
-    <tbody>${clients.slice(0,5).map(c=>`<tr><td>${esc(c.name)}</td><td>${c.loc}</td><td class="mono">${fmt(c.admitDate)}</td><td>${c.session}</td><td>${c.days.map(d=>DAY_SHORT[d]).join(' ')||'—'}</td><td>${c.plans[0]?`${fmt(c.plans[0].date)} → ${c.plans[0].loc}`:'—'}</td><td>${esc(c.clinician)||'—'}</td><td>${c.housing}</td></tr>`).join('')}</tbody></table></div>
+    <div class="tablewrap" style="margin-top:8px"><table><thead><tr><th>Client</th><th>LOC</th><th>Admitted</th><th>Schedule</th><th>Step-down</th><th>Clinician</th><th>Housing</th></tr></thead>
+    <tbody>${clients.slice(0,5).map(c=>`<tr><td>${esc(c.name)}</td><td>${c.loc}</td><td class="mono">${fmt(c.admitDate)}</td><td>${c.days.map(d=>DAY_SHORT[d]).join(' ')||'—'}</td><td>${c.plans[0]?`${fmt(c.plans[0].date)} → ${c.plans[0].loc}`:'—'}</td><td>${esc(c.clinician)||'—'}</td><td>${c.housing}</td></tr>`).join('')}</tbody></table></div>
     ${clients.length>5?`<p>…and ${clients.length-5} more.</p>`:''}
     <div class="actions" style="margin-top:10px"><button class="btn primary" id="imp-add">Add ${clients.length} to census</button><button class="btn" id="imp-replace">Replace census with these ${clients.length}</button></div>`;
 }
@@ -915,10 +904,10 @@ document.addEventListener('dragleave',e=>{e.target.closest?.('#dz')?.classList.r
 document.addEventListener('drop',e=>{const dz=e.target.closest?.('#dz');if(dz){e.preventDefault();dz.classList.remove('over');const f=e.dataTransfer.files[0];if(f)handleFile(f)}});
 document.addEventListener('click',e=>{
   if(e.target.id==='imp-sample'){
-    const t=`Client name,Admission date,Projected step-down date,Projected DC date,LOC,Frequency,Attendance schedule,Clinician,Case manager,Psych APN,Referral source,Incoming commitment,LPD or commuter,Session
-Sample Person A,${fmt2(-10)},${fmt2(11)},${fmt2(45)},PHP,5x,M-F,R. Patel LCSW,T. Nguyen,L. Moreau PMHNP,Detox center,PHP 3 wks IOP 4 wks,LPD,Day
-Sample Person B,${fmt2(-25)},${fmt2(6)},${fmt2(30)},IOP,3x,M W Th,M. Okafor LPC,K. Brooks,A. Castillo PMHNP,EAP,IOP 6 wks,Commuter,Evening
-Sample Person C,${fmt2(3)},,,Pending,,,J. Lindqvist LMFT,S. Haddad,L. Moreau PMHNP,Hospital ED,PHP 4 wks,LPD,Day`;
+    const t=`Client name,Admission date,Projected step-down date,Projected DC date,LOC,Frequency,Attendance schedule,Clinician,Case manager,Psych APN,Referral source,Incoming commitment,LPD or commuter
+Sample Person A,${fmt2(-10)},${fmt2(11)},${fmt2(45)},PHP,6x,M-Sa,R. Patel LCSW,T. Nguyen,L. Moreau PMHNP,Detox center,PC 3 wks IOP 4 wks,LPD
+Sample Person B,${fmt2(-25)},${fmt2(6)},${fmt2(30)},IOP,4x,M T W Th,M. Okafor LPC,K. Brooks,A. Castillo PMHNP,EAP,IOP 6 wks,Commuter
+Sample Person C,${fmt2(3)},,,Pending,,,J. Lindqvist LMFT,S. Haddad,L. Moreau PMHNP,Hospital ED,PC 4 wks,LPD`;
     $('#imp-paste').value=t;previewRows(parseCsv(t));
   }
   if((e.target.id==='imp-add'||e.target.id==='imp-replace')&&pending){
