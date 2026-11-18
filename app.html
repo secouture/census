@@ -49,7 +49,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .tabs a{padding:6px 14px;border-radius:7px;text-decoration:none;color:var(--muted);font-weight:600;font-size:13px}
 .tabs a.gear{display:inline-flex;align-items:center;padding:6px 9px}
 body.v-settings #stats,body.v-settings .filters{display:none}
-.filters.in-week{margin:6px 0 12px}
+.filters.in-week{margin:4px 0 8px}
 .tabs a[aria-current="page"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
 .btn{border:1px solid var(--line);background:var(--surface);padding:7px 12px;border-radius:8px;font-weight:600;font-size:13px}
 .btn:hover{border-color:var(--muted)}
@@ -773,7 +773,7 @@ function weekControls(){
 }
 function renderSchedule(){
   const list=state.clients.filter(c=>LEVELS.includes(c.loc)&&visible(c));
-  const legend=`<div class="legend">${GROUPS.map(g=>`<span><span class="swatch" style="background:var(${GROUP_VAR[g]})"></span>${g}</span>`).join('')}<span>Drag a name to another day or time block to change that client's schedule. PC is all day only, and evening groups run Mon, Tue and Thu only. Click a name for details.</span></div>`;
+  const legend=`<div class="legend wk-hint"><span>Drag a name to another day or time block to change that client's schedule. PC is all day only, and evening groups run Mon, Tue and Thu only. Click a name for details.</span></div>`;
   const cols=weekDates().map(({k,date})=>{
     const cs=list.filter(c=>c.days.includes(k)).sort((a,b)=>RANK[a.loc]-RANK[b.loc]||a.name.localeCompare(b.name));
     const by=g=>cs.filter(c=>group(c.loc)===g).length, lpd=cs.filter(c=>c.housing==='LPD').length;
@@ -836,7 +836,7 @@ function setView(html){
   fl.querySelectorAll('.seg.wk').forEach(x=>x.remove());
   if(fl.parentNode!==vw.parentNode)vw.parentNode.insertBefore(fl,vw);
   vw.innerHTML=html;
-  if(view==='schedule'){const lg=vw.querySelector('.legend');if(lg)lg.after(fl);
+  if(view==='schedule'){const wb=vw.querySelector('.wkbar');if(wb)wb.after(fl);
     /* Week view: the 3-day/Full week switch sits in the filter row, Reset sample data takes its place up top */
     const seg=vw.querySelector('.wkbar .seg.wk');if(seg){seg.replaceWith(rb);fl.appendChild(seg)}}
   fl.classList.toggle('in-week',view==='schedule');
