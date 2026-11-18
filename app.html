@@ -410,6 +410,8 @@ body{--prog-soft:color-mix(in srgb,var(--prog) 20%,var(--surface));--prog-soft-i
 .wk-btn b{background:color-mix(in srgb,var(--prog) 22%,transparent)}
 .wk-btn:hover,.stat.add-tile:hover{filter:none;background:color-mix(in srgb,var(--prog) 28%,var(--surface))}
 .wk-btn[aria-expanded="true"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--prog) 30%,transparent),0 0 0 3px color-mix(in srgb,var(--prog) 25%,transparent)}
+.num-link{border:0;background:none;padding:0;font:inherit;font-family:var(--f-display);cursor:pointer;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:4px;text-decoration-color:color-mix(in srgb,currentColor 35%,transparent);display:block}
+.num-link:hover,.num-link[aria-expanded="true"]{text-decoration-color:currentColor}
 /* Settings */
 .set-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
 .set-top .set-h{margin:0}
@@ -800,6 +802,15 @@ function runScheduled(){
 }
 
 /* ---------- rendering ---------- */
+const admitsToday=()=>state.clients.filter(c=>c.loc==='Pending'&&c.admitDate===TODAY);
+const dcsToday=()=>state.clients.filter(c=>c.dischargedOn?c.dischargedOn===TODAY:(isActive(c)&&c.dcDate===TODAY));
+/* Pop-up behind the Pending box numbers: who is admitting / discharging today */
+function renderTodayList(k){
+  const adm=k==='adm', list=adm?admitsToday():dcsToday(), title=adm?'Admissions today':'Discharges today';
+  const meta=c=>adm?[c.commitDays?`LOS ${c.commitDays} days`:'',c.housing,c.referral?`from ${esc(c.referral)}`:'',c.clinician].filter(Boolean).join(' · ')
+    :[c.dischargedOn?'discharged today':'projected DC today', c.admitDate?`admitted ${fmt(c.admitDate)}`:'', c.clinician].filter(Boolean).join(' · ');
+  return `<div class="attn-pop" id="attn-pop" role="dialog" aria-label="${title}"><h2>${title} · ${fmt(TODAY)}<button type="button" data-pop="${k}" aria-label="Close">×</button></h2><p class="pop-sub">${adm?'Pending clients scheduled to admit today.':'Clients with a discharge or projected DC date of today.'} Click a name to open their card.</p>${list.length?`<ul>${list.map(c=>`<li><button data-open="${c.id}"><span class="an">${esc(c.name)} <span>· ${c.loc}</span></span><span class="flag info" style="padding:0;background:none">${meta(c)}</span></button></li>`).join('')}</ul>`:'<p class="empty">No one today.</p>'}</div>`;
+}
 const $=s=>document.querySelector(s);
 let view='census', sort={k:'loc',dir:1}, openId=null;
 
@@ -808,22 +819,22 @@ function renderStats(){
   const act=state.clients.filter(isActive);
   const n=l=>state.clients.filter(c=>group(c.loc)===l&&!isDC(c)).length;
   const lpd=act.filter(c=>c.housing==='LPD').length;
-  const admToday=state.clients.filter(c=>c.loc==='Pending'&&c.admitDate===TODAY).length;
-  const dcToday=state.clients.filter(c=>c.dischargedOn?c.dischargedOn===TODAY:(isActive(c)&&c.dcDate===TODAY)).length;
+  const admToday=admitsToday().length, dcToday=dcsToday().length;
+  const num=(v,k,color,label)=>v?`<button type="button" class="v num-link" data-pop="${k}" aria-expanded="${pop===k}" style="color:${color}" title="Show ${label}" aria-label="${v} ${label}: show list">${v}</button>`:`<div class="v" style="color:${color}">${v}</div>`;
   const tk=dayKey(TODAY), todayCount=act.filter(c=>c.days.includes(tk)).length;
   const attn=state.clients.filter(c=>recentDc(c)&&flags(c).some(f=>f.lvl!=='info')).length;
   const st=(k,v,s,cls='',sw='')=>`<div class="stat ${cls}"><div class="k">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   $('#stats').innerHTML=
     `<button type="button" class="stat add-tile" data-add-client title="Add a client" aria-label="Add client"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="currentColor" d="M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.6-7 4v2h11.1a6 6 0 0 1-.1-1c0-1.9.9-3.6 2.3-4.7A13 13 0 0 0 10 14Zm9 0h-2v3h-3v2h3v3h2v-3h3v-2h-3v-3Z"/></svg><span>Add client</span></button>`+
     `<div class="stat"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${shownGroups().map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
-    `<div class="stat"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${admToday}</div><div class="s">admits today</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DCs today</div></div></div></div>`+
+    `<div class="stat"><div class="k">Pending</div><div class="split"><div>${num(admToday,'adm',cvar('Pending'),'admissions today')}<div class="s">admits today</div></div><div>${num(dcToday,'dct','var(--dc)','discharges today')}<div class="s">DCs today</div></div></div></div>`+
     `<div class="stat"><div class="k">Residence</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
     `<a href="#schedule" class="stat link" data-goto-today title="Open today in the 3-day week view"><div class="k">Expected today</div><div class="v">${tk==='sun'?'—':todayCount}</div><div class="s">${tk==='sun'?'no groups Sunday · ':'scheduled · '}<u>see schedule →</u></div></a>`+
     '';
   const wk=weekEvents(), wkLeft=wk.days.reduce((n,d)=>n+(d.date>=TODAY?d.ev.length:0),0);
   $('#bell-slot').innerHTML=`<button type="button" class="attn-btn ${attn?'on':''}" data-pop="attn" aria-expanded="${pop==='attn'}" title="Needs attention" aria-label="Needs attention: ${attn}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg>${attn?`<b>${attn>99?'99+':attn}</b>`:''}</button>`;
   $('#attn-slot').innerHTML=`<button type="button" class="wk-btn" data-pop="week" aria-expanded="${pop==='week'}" title="Admissions, LOC changes and discharges this week"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2Zm-2 8h14v10H5Z" fill="currentColor"/></svg><span class="lbl">Week overview</span><b>${wkLeft}</b></button>`+
-    (pop?'<div class="attn-scrim"></div>'+(pop==='attn'?renderAttention(state.clients):renderWeekOverview(wk)):'');
+    (pop?'<div class="attn-scrim"></div>'+(pop==='attn'?renderAttention(state.clients):pop==='week'?renderWeekOverview(wk):renderTodayList(pop)):'');
 }
 function renderStaffFilter(){
   const sel=$('#f-staff'), cur=F.staff;
