@@ -100,6 +100,10 @@ body.v-settings #stats,body.v-settings .filters{display:none}
 @media (max-width:760px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat.add-tile{flex-direction:row;padding:10px}}
 .stat .split{display:flex;gap:18px}
 .stat .split>div+div{padding-left:18px;border-left:1px solid var(--line)}
+/* Same layout in every stat box (matches the Pending button): content centered vertically, split columns at the same widths */
+.stat:not(.add-tile){display:flex;flex-direction:column;justify-content:center;line-height:normal}
+.stat .split>div{min-width:76px}
+@media (max-width:760px){.stat .split{gap:10px}.stat .split>div{min-width:0}.stat .split>div+div{padding-left:10px}}
 .stat .pills{margin-top:4px}
 .stat .pill{font-size:12px;padding:2px 7px}
 a.stat.link{text-decoration:none;color:inherit;cursor:pointer}
@@ -415,7 +419,6 @@ body{--prog-soft:color-mix(in srgb,var(--prog) 20%,var(--surface));--prog-soft-i
 .wk-btn b{background:color-mix(in srgb,var(--prog) 22%,transparent)}
 .wk-btn:hover,.stat.add-tile:hover{filter:none;background:color-mix(in srgb,var(--prog) 28%,var(--surface))}
 .wk-btn[aria-expanded="true"]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--prog) 30%,transparent),0 0 0 3px color-mix(in srgb,var(--prog) 25%,transparent)}
-.pend-btn{display:block;line-height:normal}
 #attn-pop ul+.pl-h,#attn-pop .empty+.pl-h{border-top:1px solid var(--line);padding-top:12px;margin-top:10px}
 .pl-h{margin:10px 8px 2px;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
 .pl-h span{color:var(--ink)}
