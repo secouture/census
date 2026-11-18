@@ -452,6 +452,7 @@ button.stat.pend-btn[aria-expanded="true"]{border-color:var(--prog);background:c
 /* Census/Archive header row: program-tinted fill so it stands out from the page background */
 table.census thead th,table.census thead th:first-child{background:color-mix(in srgb,var(--prog) 24%,var(--surface));color:color-mix(in srgb,var(--prog) 55%,var(--ink));box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--prog) 40%,transparent)}
 table.census thead th:first-child{box-shadow:inset 0 -2px 0 color-mix(in srgb,var(--prog) 40%,transparent),inset -1px 0 0 var(--line)}
+.bopts button.stale{border-style:dashed;border-color:var(--warn);color:var(--warn)}
 /* Settings */
 .set-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
 .set-top .set-h{margin:0}
@@ -630,6 +631,8 @@ function schedSummary(x){
   const groups={};x.days.forEach(d=>{const b=(x.blocks||{})[d]||defaultBlock(x.loc,d);(groups[b]=groups[b]||[]).push(DAY_SHORT[d])});
   return BLOCK_ORDER.filter(b=>groups[b]).map(b=>`${groups[b].join(' ')} · ${BLOCKS[b].t}`).join('; ');
 }
+/* Next step-down LOC, skipping levels this program has turned off */
+const nextOn=l=>{let n=NEXT_LOC[l],g=0;while(n&&!locOn(n)&&g++<9)n=NEXT_LOC[n];return n||null};
 const NEXT_LOC={Pending:'PC5',PC6:'IOP5',PC5:'IOP5',IOP6:'IOP3',IOP5:'IOP3',IOP4:'IOP3',IOP3:'OP',EIOP:'OP',OP:null};
 
 /* ---------- dates ---------- */
@@ -748,6 +751,7 @@ function flags(c){
   }
   if(dcMissing(c))f.push({lvl:'warn',text:'Discharge details missing'});
   if(isDC(c))return f;
+  {const bad=c.days.filter(d=>!blocksFor(c.loc,d).includes(blk(c,d)));if(bad.length)f.push({lvl:'warn',text:`Scheduled for a time not offered (${bad.map(d=>DAY_LABEL[d]).join(', ')})`})}
   if(c.dischargedOn)f.push({lvl:'info',text:`Discharging ${fmt(c.dischargedOn)}`});
   const np=nextPlan(c);
   if(np){const d=diff(TODAY,np.date);if(d<=3)f.push({lvl:'info',text:d<=1?`Moves to ${np.loc} tomorrow`:`Moves to ${np.loc} in ${d}d`})}
@@ -1260,7 +1264,7 @@ function pickerHTML(ctx,x){
   return `<div class="fld"><span class="lbl">Days and times · ${n}x/wk${exp&&n!==exp?` <span class="warnt">${x.loc} is ${exp} days</span>`:''}</span>
     <p class="hint">${note}</p>
     <div class="bgrid" style="--c:${cvar(x.loc)}">${DAYS.map(d=>{const on=x.days.includes(d),b=on?((x.blocks||{})[d]||defaultBlock(x.loc,d)):'OFF';
-      return `<div class="brow"><span class="bday">${DAY_LABEL[d]}</span><div class="bopts">${['OFF',...blocksFor(x.loc,d)].map(o=>`<button type="button" data-ctx="${ctx}" data-sd="${d}" data-sb="${o}" aria-pressed="${b===o}" class="${o==='OFF'?'off':''}">${o==='OFF'?'Off':`${BLOCKS[o].n}<small>${BLOCKS[o].t}</small>`}</button>`).join('')}</div></div>`}).join('')}</div></div>`;
+      return `<div class="brow"><span class="bday">${DAY_LABEL[d]}</span><div class="bopts">${(()=>{const ok=blocksFor(x.loc,d);return ['OFF',...ok,...(b!=='OFF'&&!ok.includes(b)?[b]:[])].map(o=>{const stale=o!=='OFF'&&!ok.includes(o);return `<button type="button" data-ctx="${ctx}" data-sd="${d}" data-sb="${o}" aria-pressed="${b===o}" class="${o==='OFF'?'off':''}${stale?' stale':''}" ${stale?'title="Not offered on this day in Settings. Pick another time."':''}>${o==='OFF'?'Off':`${BLOCKS[o].n}<small>${stale?'not offered':BLOCKS[o].t}</small>`}</button>`}).join('')})()}</div></div>`}).join('')}</div></div>`;
 }
 function pickerSet(x,d,o){
   const days=x.days.filter(k=>k!==d), blocks={...(x.blocks||{})};delete blocks[d];
@@ -1584,7 +1588,7 @@ function previewRows(rows){
     const loc=parseLoc(g('loc'),g('freq'))||'Pending';
     const cm=parseCommit(g('commit'));
     const name=String(g('name')||'').trim();if(!name)return null;
-    const sd=parseDate(g('stepDown')), to=loc==='Discharged'?null:NEXT_LOC[loc];
+    const sd=parseDate(g('stepDown')), to=loc==='Discharged'?null:nextOn(loc);
     const plans=sd&&to&&loc!=='Discharged'?[{date:sd,loc:to,days:[...(DEFAULT_DAYS[to]||[])]}]:[];
     const st=String(g('days')).toLowerCase(), hint=/6\s*-\s*9|eve|night/.test(st)?'EVE':/12:30|after|pm/.test(st)?'PM':'AM';
     const dd=LEVELS.includes(loc)?parseDays(g('days'),loc):[];
