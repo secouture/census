@@ -467,6 +467,13 @@ table.census thead th:first-child{box-shadow:inset 0 -2px 0 color-mix(in srgb,va
 table.aud td.aud-d{white-space:normal;min-width:280px}
 .aud-act{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--sunk);color:var(--muted)}
 .aud-act.viewed{color:var(--accent)}.aud-act.created,.aud-act.restored{color:var(--op)}.aud-act.archived,.aud-act.deleted{color:var(--crit)}.aud-act.settings{color:var(--php)}
+.ur-in{border:1px solid transparent;background:transparent;border-radius:6px;padding:2px 4px;font:inherit;font-size:inherit;color:var(--ink);width:118px}
+.ur-in:hover{border-color:var(--line);background:var(--surface)}
+.ur-in:focus{border-color:var(--accent);background:var(--surface);outline:none;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 20%,transparent)}
+td.ur-td{padding-top:2px;padding-bottom:2px}
+.ur-in{width:78px;font-family:var(--f-mono)}
+.ur-in::placeholder{color:color-mix(in srgb,var(--muted) 60%,transparent)}
+.ur-in.bad{border-color:var(--crit);background:color-mix(in srgb,var(--crit) 8%,var(--surface))}
 /* Settings */
 .set-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
 .set-top .set-h{margin:0}
@@ -789,7 +796,7 @@ function auditCsv(){
   const lines=[['Date/time','User','Action','Client','Details'].join(',')].concat((state.audit||[]).slice().reverse().map(e=>[new Date(e.ts).toLocaleString('en-US'),e.user,e.act,e.client||'',audDetail(e)].map(q).join(',')));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download=`audit-log-${PROG}-${TODAY}.csv`;document.body.appendChild(a);a.click();a.remove();
 }
-const audVal=(k,v)=>v==null||v===''?'(blank)':/Date|dischargedOn/.test(k)?fmt(v):String(v);
+const audVal=(k,v)=>v==null||v===''?'(blank)':/Date|dischargedOn|nextUr/.test(k)?fmt(v):String(v);
 function auditDiff(){
   if(!auditBase){auditBaseline();return}
   const prev=auditBase, cur=audClone();
@@ -948,6 +955,12 @@ function runScheduledRaw(){
   return done;
 }
 
+/* Next UR typed in the table: 12/1/26, 12/01/2026, 120126 or 12012026 → ISO date ('' if not a real date) */
+function parseUr(t){
+  let m=t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})$/)||t.match(/^(\d{2})(\d{2})(\d{2}|\d{4})$/);if(!m)return '';
+  let [,mo,d,y]=m.map(Number);if(y<100)y+=2000;const dt=new Date(y,mo-1,d);
+  return dt.getFullYear()===y&&dt.getMonth()===mo-1&&dt.getDate()===d?`${y}-${pad(mo)}-${pad(d)}`:'';
+}
 /* ---------- rendering ---------- */
 const admitsToday=()=>state.clients.filter(c=>c.loc==='Pending'&&c.admitDate===TODAY);
 const dcsToday=()=>state.clients.filter(c=>c.dischargedOn?c.dischargedOn===TODAY:(isActive(c)&&c.dcDate===TODAY));
@@ -1106,7 +1119,7 @@ const COLS=[
   ['name','Client',c=>c.name],['alert','Alerts',c=>{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return f.length?sev[f[0].lvl]:9}],
   ['loc','LOC',c=>c.loc],
   ['admitDate','Admitted',c=>c.admitDate],['los','LOS',c=>losDays(c)||''],['nextUr','Next UR',c=>!isDC(c)&&c.nextUr||'9'],
-  ['stepDown','Proj. step-down',c=>nextPlan(c)?.date||'9'],['dcDate','Proj. DC',c=>c.dcDate],
+  ['stepDown','Step-Down',c=>nextPlan(c)?.date||'9'],['dcDate','Proj. DC',c=>c.dcDate],
   ['days','Schedule',c=>c.days.map(d=>DAYS.indexOf(d)+BLOCK_ORDER.indexOf(blk(c,d))/10).join('')],
   ['clinician','Clinician',c=>c.clinician],['caseManager','Case manager',c=>c.caseManager],['psychApn','Psych APN',c=>c.psychApn],['housing','Residence',c=>c.housing],
   ['referral','Referral source',c=>c.referral],['commit','Incoming commitment',c=>c.commitDays||0],
@@ -1124,7 +1137,7 @@ function cell(c,k){
     case 'loc':return isDC(c)?`<td><span class="loc-sel static" style="--c:${cvar(c.loc)}">${c.loc}</span><span class="of"> · discharged</span></td>`:`<td><select class="loc-sel" data-row-loc="${c.id}" aria-label="Level of care for ${esc(c.name)}">${pickLocs(c.loc).map(l=>`<option value="${l}" ${l===c.loc?'selected':''}>${LOC_NAME[l]}</option>`).join('')}</select></td>`;
     case 'housing':return `<td><select class="h-sel ${c.housing==='LPD'?'lpd':''}" data-row-house="${c.id}" aria-label="Residence for ${esc(c.name)}"><option ${c.housing==='LPD'?'selected':''}>LPD</option><option ${c.housing!=='LPD'?'selected':''}>Commuter</option></select></td>`;
     case 'admitDate':return `<td class="mono">${fmt(c.admitDate)}</td>`;
-    case 'nextUr':return `<td class="mono">${isDC(c)?'—':fmt(c.nextUr)}</td>`;
+    case 'nextUr':return `<td class="mono ur-td">${isDC(c)?'—':`<input type="text" inputmode="numeric" placeholder="mm/dd/yy" maxlength="10" class="ur-in" data-row-ur="${c.id}" value="${c.nextUr?fmt(c.nextUr):''}" aria-label="Next UR for ${esc(c.name)}" title="Type a date, then press Enter to go to the next client">`}</td>`;
     case 'los':return `<td class="mono">${losDays(c)||'—'}</td>`;
     case 'stepDown':{if(isDC(c))return '<td><span class="of">n/a</span></td>';const np=nextPlan(c);
       return `<td><button class="plan-link" data-plan="${c.id}" title="Schedule LOC changes">${np?`<span class="mono">${fmt(np.date)}</span> → <b style="color:${cvar(np.loc)}">${np.loc==='Discharged'?'DC':np.loc}</b>${c.plans.length>1?` <span class="of">+${c.plans.length-1}</span>`:''}`:'<span class="add">+ Schedule</span>'}</button></td>`}
@@ -1332,6 +1345,12 @@ function setField(c,f,v){
   else $('.drawer-h h2').textContent=c.name;
 }
 document.addEventListener('change',e=>{
+  /* Next UR typed straight into the table: save without redrawing so focus stays put for fast entry down the list */
+  if(e.target.matches('[data-row-ur]')){const c=byId(e.target.dataset.rowUr);if(!c)return;
+    const raw=e.target.value.trim(),v=raw?parseUr(raw):'';
+    if(raw&&!v){e.target.classList.add('bad');toast(`"${raw}" isn't a date. Use mm/dd/yy, like 12/01/26.`);return}
+    e.target.classList.remove('bad');e.target.value=v?fmt(v):'';
+    if((c.nextUr||'')!==v){c.nextUr=v;c.history.push({date:TODAY,text:`Next UR: ${v?fmt(v):'cleared'}`});save()}return}
   if(e.target.matches('[data-failnote]')){const r=state.archive.find(x=>x.id===e.target.dataset.failnote);if(r){r.history=r.history||[];r.history.push({date:TODAY,text:'Note updated: '+(r.failNote||'(cleared)')});save();if(view==='archive'&&!$('.drawer'))render()}return}
   const c=byId(openId);
   if(e.target.matches('[data-pf]')){const i=+e.target.dataset.p,k=e.target.dataset.pf,pl=planDraft[i];pl[k]=e.target.value;
@@ -1529,6 +1548,10 @@ document.addEventListener('click',e=>{
   const sd=t.closest('[data-staff-del]');if(sd){const k=sd.dataset.staffDel,i=+sd.dataset.i,n=state.staff[k][i];snap();state.staff[k].splice(i,1);saveSoon();render();toast(`${n} removed from the list.`,true);return}
 });
 document.addEventListener('keydown',e=>{
+  if(e.target.matches&&e.target.matches('[data-row-ur]')&&(e.key==='Enter'||e.altKey&&(e.key==='ArrowDown'||e.key==='ArrowUp'))){
+    e.preventDefault();e.target.dispatchEvent(new Event('change',{bubbles:true}));
+    if(e.target.classList.contains('bad'))return;
+    const all=[...document.querySelectorAll('[data-row-ur]')],i=all.indexOf(e.target),n=all[e.key==='ArrowUp'?i-1:i+1];if(n){n.focus();n.scrollIntoView({block:'nearest'})}return}
   if(e.key==='Escape'&&$('#confirm-slot').innerHTML){closeConfirm();return}
   if(e.key==='Escape'&&!$('#prog-menu').hidden){$('#prog-menu').hidden=true;$('#prog-btn').setAttribute('aria-expanded','false');return}
   if(e.key==='Escape'&&$('#rowpop')){$('#rowpop').remove();return}
