@@ -456,6 +456,17 @@ table.census thead th:first-child{box-shadow:inset 0 -2px 0 color-mix(in srgb,va
 .save-status{margin-left:8px;font-weight:600;font-size:12px}
 .save-status.pending{color:var(--warn)}
 .save-status.saved{color:var(--op)}
+.aud-sum{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.modal.audit{width:min(1000px,calc(100% - 32px))}
+.modal.audit h2{display:flex;justify-content:space-between;align-items:center}
+.modal.audit h2 .x{border:0;background:none;font-size:22px;cursor:pointer;color:var(--muted)}
+.aud-bar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.aud-bar input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;background:var(--surface);color:var(--ink)}
+.aud-bar select{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;font-size:13px;background:var(--surface);color:var(--ink)}
+.aud-wrap{max-height:55vh}
+table.aud td.aud-d{white-space:normal;min-width:280px}
+.aud-act{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:var(--sunk);color:var(--muted)}
+.aud-act.viewed{color:var(--accent)}.aud-act.created,.aud-act.restored{color:var(--op)}.aud-act.archived,.aud-act.deleted{color:var(--crit)}.aud-act.settings{color:var(--php)}
 /* Settings */
 .set-top{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:6px}
 .set-top .set-h{margin:0}
@@ -580,7 +591,7 @@ function sampleArchiveFor(){const a=sampleArchive();if(PROG!=='mh')return a;a.fo
 function switchProgram(p){
   if(!PROGRAMS[p]||p===PROG)return;
   save();saveState='';PROG=p;KEY=PROGRAMS[p].key;try{localStorage.setItem('census-program',p)}catch(e){}
-  state=load();undoSnap=null;openId=null;pop=null;F.q='';F.staff='';F.house='';F.loc='';
+  state=load();auditBaseline();undoSnap=null;openId=null;pop=null;F.q='';F.staff='';F.house='';F.loc='';
   $('#f-search').value='';$('#f-house').value='';$('#layer').innerHTML='';$('#rowpop')?.remove();
   runScheduled();render();toast(`Switched to Census - ${PROGRAMS[p].name}.`);
 }
@@ -733,17 +744,93 @@ function sampleArchive(){
   ];
 }
 
+/* ---------- audit log ----------
+   Every change is found by comparing the data with what was last saved, so nothing can be missed; opening a client's
+   card or archive record is logged as a view. Kept per program, newest last, capped. In the real version this is written
+   on the server, can't be edited or deleted, and records each person's Microsoft sign-in instead of AUDIT_USER. */
+var auditBase=null, auditAs=null;
+const AUDIT_USER='Prototype user';
+const AUDIT_MAX=5000;
+const AUD_FIELDS={name:'Name',loc:'LOC',housing:'Residence',admitDate:'Admission date',dcDate:'Projected DC',commitDays:'Incoming commitment (days)',commitNote:'Plan of care',
+  clinician:'Clinician',caseManager:'Case manager',psychApn:'Psych APN',referral:'Referral source',dischargedOn:'Date of discharge',dcType:'Discharge type',dcCompleted:'Completed commitment?',dcLonger:'Longer than commitment?',failNote:'What happened'};
+const audClone=()=>{const {audit,...rest}=state;return JSON.parse(JSON.stringify(rest))};
+function auditBaseline(){auditBase=audClone()}
+function audPush(e){
+  state.audit=state.audit||[];
+  const last=state.audit[state.audit.length-1], now=new Date();
+  // Typing in a field saves on each keystroke: fold those into one entry
+  if(last&&e.field&&last.field===e.field&&last.cid===e.cid&&last.act===e.act&&now-new Date(last.ts)<60000){last.to=e.to;last.ts=now.toISOString();return}
+  state.audit.push({ts:now.toISOString(),user:auditAs||AUDIT_USER,...e});
+  if(state.audit.length>AUDIT_MAX)state.audit.splice(0,state.audit.length-AUDIT_MAX);
+}
+function auditView(c,where){const l=(state.audit||[]).slice(-1)[0];if(l&&l.act==='Viewed'&&l.cid===c.id&&new Date()-new Date(l.ts)<60000)return;audPush({act:'Viewed',cid:c.id,client:c.name,detail:where});save()}
+function auditEvent(act,detail){audPush({act,detail})}
+const audTime=ts=>{const d=new Date(ts);return `${fmt(d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()))} ${d.getHours()%12||12}:${pad(d.getMinutes())} ${d.getHours()<12?'am':'pm'}`};
+const audDetail=e=>e.field?`${{schedule:'Schedule',plans:'Step-down plan'}[e.field]||AUD_FIELDS[e.field]}: ${e.field==='plans'?e.to:`${e.from} → ${e.to}`}`:(e.detail||'');
+const AUD_ACTS=['Viewed','Created','Updated','Archived','Restored','Deleted','Settings','Undo','System'];
+let audF={q:'',act:'',n:200};
+function renderAudit(){
+  const all=(state.audit||[]).slice().reverse(), q=audF.q.toLowerCase();
+  const rows=all.filter(e=>(!audF.act||e.act===audF.act)&&(!q||[e.client,e.user,audDetail(e),e.act].join(' ').toLowerCase().includes(q)));
+  $('#layer').innerHTML=`<div class="scrim" data-close></div>
+  <div class="modal audit" role="dialog" aria-label="Audit log">
+    <h2>Audit log · Census - ${PROGRAMS[PROG].name}<button type="button" class="x" data-close aria-label="Close">×</button></h2>
+    <p class="help">Read-only. Newest first. ${all.length} entries in total.</p>
+    <div class="aud-bar"><input type="search" id="aud-q" placeholder="Search client, person or detail…" value="${esc(audF.q)}">
+      <select id="aud-act"><option value="">All actions</option>${AUD_ACTS.map(a=>`<option ${audF.act===a?'selected':''}>${a}</option>`).join('')}</select>
+      <button class="btn small" type="button" data-audit-csv>Download CSV</button></div>
+    <div class="tablewrap scroll aud-wrap"><table class="census aud"><thead><tr><th>Date / time</th><th>User</th><th>Action</th><th>Client</th><th>Details</th></tr></thead>
+    <tbody>${rows.slice(0,audF.n).map(e=>`<tr><td>${audTime(e.ts)}</td><td>${esc(e.user)}</td><td><span class="aud-act ${e.act.toLowerCase()}">${e.act}</span></td><td>${esc(e.client||'—')}</td><td class="aud-d">${esc(audDetail(e))}</td></tr>`).join('')||`<tr><td colspan="5" class="of">No entries${all.length?' match':' yet'}.</td></tr>`}</tbody></table></div>
+    ${rows.length>audF.n?`<button class="btn small" type="button" data-audit-more>Show more (${rows.length-audF.n} older)</button>`:''}
+    <p class="help">Prototype: entries are kept in this browser. In the real version they're stored on the server, can't be edited or deleted, and show each person's Microsoft sign-in.</p>
+  </div>`;
+}
+function auditCsv(){
+  const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const lines=[['Date/time','User','Action','Client','Details'].join(',')].concat((state.audit||[]).slice().reverse().map(e=>[new Date(e.ts).toLocaleString('en-US'),e.user,e.act,e.client||'',audDetail(e)].map(q).join(',')));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download=`audit-log-${PROG}-${TODAY}.csv`;document.body.appendChild(a);a.click();a.remove();
+}
+const audVal=(k,v)=>v==null||v===''?'(blank)':/Date|dischargedOn/.test(k)?fmt(v):String(v);
+function auditDiff(){
+  if(!auditBase){auditBaseline();return}
+  const prev=auditBase, cur=audClone();
+  const idx=s=>{const m=new Map();(s.clients||[]).forEach(c=>m.set(c.id,{c,where:'census'}));(s.archive||[]).forEach(c=>m.set(c.id,{c,where:'archive'}));return m};
+  const A=idx(prev),B=idx(cur);
+  B.forEach(({c,where},id)=>{
+    const o=A.get(id);
+    if(!o){audPush({act:'Created',cid:id,client:c.name,detail:where==='archive'?'Added to archive':`Added as ${c.loc}`});return}
+    if(o.where!==where)audPush({act:where==='archive'?'Archived':'Restored',cid:id,client:c.name,detail:where==='archive'?'Removed from census to archive':'Restored to census'});
+    Object.keys(AUD_FIELDS).forEach(k=>{const a=o.c[k]??'',b=c[k]??'';if(String(a)!==String(b))audPush({act:'Updated',cid:id,client:c.name,field:k,from:audVal(k,a),to:audVal(k,b)})});
+    const sch=x=>LEVELS.includes(x.loc)?schedSummary(x):'';
+    if(JSON.stringify([o.c.days,o.c.blocks])!==JSON.stringify([c.days,c.blocks]))audPush({act:'Updated',cid:id,client:c.name,field:'schedule',from:sch(o.c)||'(none)',to:sch(c)||'(none)'});
+    if(JSON.stringify(o.c.plans||[])!==JSON.stringify(c.plans||[]))audPush({act:'Updated',cid:id,client:c.name,field:'plans',from:'',to:(c.plans||[]).map(p=>`${fmt(p.date)} → ${p.loc}`).join(', ')||'none remaining'});
+  });
+  A.forEach(({c},id)=>{if(!B.has(id))audPush({act:'Deleted',cid:id,client:c.name,detail:'Permanently removed'})});
+  // Settings
+  const ST={clinician:'Clinicians',caseManager:'Case managers',psychApn:'Psych APNs'};
+  Object.keys(ST).forEach(k=>{const a=prev.staff?.[k]||[],b=cur.staff?.[k]||[];const add=b.filter(x=>!a.includes(x)),rem=a.filter(x=>!b.includes(x));
+    if(add.length||rem.length)audPush({act:'Settings',detail:`${ST[k]} list: ${[add.length?'added '+add.join(', '):'',rem.length?'removed '+rem.join(', '):''].filter(Boolean).join('; ')}`})});
+  const ps=prev.sched||{},cs=cur.sched||{},dl=a=>DAYS.filter(d=>(a||[]).includes(d)).map(d=>DAY_LABEL[d]).join(', ')||'none';
+  BLOCK_ORDER.forEach(k=>{const a=ps.hours?.[k],b=cs.hours?.[k];if(a&&b&&a.join()!==b.join())audPush({act:'Settings',detail:`${BLOCKS[k].n} hours: ${blockLabel(a)} → ${blockLabel(b)}`})});
+  if(dl(ps.eveDays)!==dl(cs.eveDays))audPush({act:'Settings',detail:`Evening group nights: ${dl(ps.eveDays)} → ${dl(cs.eveDays)}`});
+  if(ps.openDays&&dl(ps.openDays)!==dl(cs.openDays))audPush({act:'Settings',detail:`Days the program runs: ${dl(ps.openDays)} → ${dl(cs.openDays)}`});
+  if(ps.locs&&String(ps.locs)!==String(cs.locs))audPush({act:'Settings',detail:`Levels of care offered: ${(ps.locs||[]).join(', ')} → ${(cs.locs||[]).join(', ')}`});
+  LEVELS.forEach(l=>{const a=ps.days?.[l],b=cs.days?.[l];if(a&&b&&String(a)!==String(b))audPush({act:'Settings',detail:`${l} default days: ${dl(a)} → ${dl(b)}`})});
+  auditBase=cur;
+}
+
 /* ---------- state ---------- */
 let state=load();
+auditBaseline();
 applySched();
 const STAFF_ROLES=[['clinician','Clinicians','Clinician'],['caseManager','Case managers','Case manager'],['psychApn','Psych APNs','Psych APN']];
 function ensureStaff(s){s.sched=s.sched||SCHED_DEFAULT();s.staff=s.staff||{clinician:[...CLIN],caseManager:[...CM],psychApn:[...APN]};
   ['clinician','caseManager','psychApn'].forEach(k=>{s.staff[k]=s.staff[k]||[];s.clients.forEach(c=>{if(c[k]&&!s.staff[k].includes(c[k]))s.staff[k].push(c[k])})});return s}
 function migrate(s){[...s.clients,...s.archive].forEach(c=>{if(c.dcType&&c.dcType in DC_OLD)c.dcType=DC_OLD[c.dcType]});s.clients.forEach(c=>{if(c.loc==='Discharged'){c.loc=LEVELS.includes(c.lastLoc)?c.lastLoc:'OP';c.dcDone=true}});s.archive.forEach(a=>{if(a.locAtRemoval==='Discharged')a.locAtRemoval=LEVELS.includes(a.lastLoc)?a.lastLoc:'OP';if(a.loc==='Discharged')a.loc=a.locAtRemoval});return s}
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.clients)){s.archive=s.archive||[];return ensureStaff(migrate(s))}}catch(e){}return ensureStaff({clients:sampleFor(),archive:sampleArchiveFor(),seq:100})}
-function save(){clearTimeout(saveTimer);saveTimer=null;try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+function save(){clearTimeout(saveTimer);saveTimer=null;auditDiff();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 /* Settings changes save 5 seconds after the last change (other pages save right away). A status line on Settings shows it. */
-let saveTimer=null, saveState='';
+var saveTimer=null, saveState='';
 function setSaveStatus(t){saveState=t;const el=document.getElementById('save-status');if(el){el.textContent=t==='pending'?'Saving in a few seconds…':t==='saved'?'All changes saved':'';el.className='save-status '+t}}
 function saveSoon(){clearTimeout(saveTimer);setSaveStatus('pending');saveTimer=setTimeout(()=>{save();setSaveStatus('saved')},5000)}
 addEventListener('beforeunload',()=>{if(saveTimer)save()});
@@ -839,7 +926,9 @@ function moveSlot(id,fromDay,toDay,toBlock){
   toast(`${c.name}: ${txt}.`,true);
 }
 /* Scheduled LOC changes: on or after each entry's date, apply it automatically. */
-function runScheduled(){
+/* Scheduled step-downs applied automatically are logged under the system, not a person */
+function runScheduled(){auditDiff();const was=auditAs;auditAs='System (scheduled change)';const d=runScheduledRaw();if(d.length)save();auditAs=was;return d}
+function runScheduledRaw(){
   const done=[];
   state.clients.forEach(c=>{
     if(isDC(c)&&!c.dcDone&&c.loc!=='Pending'){c.dcDone=true;c.days=[];c.blocks={};c.plans=[];c.history.push({date:c.dischargedOn,text:`Discharged on date of discharge (from ${c.loc})`});done.push(`${c.name} discharged`)}
@@ -955,7 +1044,7 @@ function renderSettings(){
     <ul>${state.staff[k].map((n,i)=>`<li><input value="${esc(n)}" data-staff-edit="${k}" data-i="${i}" aria-label="${one} name"><span class="cl" title="Active clients assigned">${cnt(k,n)}</span><button type="button" class="x" data-staff-del="${k}" data-i="${i}" aria-label="Remove ${esc(n)}">×</button></li>`).join('')||'<li class="empty">No one yet</li>'}</ul>
     <form class="staff-add" data-staff-add="${k}"><input placeholder="Add ${one.replace('Case','case').replace('Clinician','clinician')}" aria-label="New ${one} name"><button class="btn small" type="submit">Add</button></form></div>`).join('')}</div></section>
   <section class="set-card"><h3>Treatment schedule · ${pn}</h3><p class="help">Group hours and days for this program. Changes apply to schedules you set from now on and to the Schedule page labels; clients' existing days aren't changed.</p>
-  <h4>Days the program runs</h4><div class="daypick">${DAYS.map(d=>`<label><input type="checkbox" data-open="${d}" ${isOpen(d)?'checked':''}>${DAY_LABEL[d]}</label>`).join('')}</div>
+  <h4>Days the program runs</h4><div class="daypick">${DAYS.map(d=>`<label><input type="checkbox" data-openday="${d}" ${isOpen(d)?'checked':''}>${DAY_LABEL[d]}</label>`).join('')}</div>
   <p class="help" style="margin:6px 0 16px">Unchecked days have no groups for ${pn}: they're left off the Schedule page and can't be picked on a client's schedule.</p>
   <h4>Levels of care offered</h4><div class="daypick locpick">${LEVELS.map(l=>{const k=state.clients.filter(c=>c.loc===l&&isActive(c)).length;return `<label style="--c:${cvar(l)}"><input type="checkbox" data-locon="${l}" ${locOn(l)?'checked':''}><b>${l}</b>${k&&!locOn(l)?`<span class="of">${k} still in it</span>`:''}</label>`}).join('')}</div>
   <p class="help" style="margin:6px 0 16px">Only checked levels show in the LOC dropdowns, step-down plans and census filters for ${pn}. Turning one off doesn't move anyone: clients already in it keep it until you change them.</p>
@@ -965,6 +1054,8 @@ function renderSettings(){
    <div><h4>Default days by LOC</h4><table class="set-tbl days"><tbody><tr class="hd"><td></td>${OPEN_DAYS.map(d=>`<td>${DAY_SHORT[d]}</td>`).join('')}</tr>${LEVELS.filter(locOn).map(l=>`<tr><th style="color:${cvar(l)}">${l}${CUSTOM_DAYS.includes(l)?' <span class="of">varies</span>':''}</th>${OPEN_DAYS.map(d=>`<td><input type="checkbox" data-dd="${l}" data-day="${d}" ${sc.days[l].includes(d)?'checked':''} aria-label="${l} ${DAY_LABEL[d]}"></td>`).join('')}</tr>`).join('')}</tbody></table>
     <p class="help" style="margin-top:6px">Used when a client moves to that LOC. You can still change any client's days on their card.</p></div>
   </div></section>
+  <section class="set-card"><h3>Audit log · ${pn}</h3><p class="help">Every time someone opens a client's card or changes client information, discharges, archives or restores a client, or changes these settings, it's recorded here with the date, time and person. ${pn} keeps its own log.</p>
+  <div class="aud-sum"><span><b>${(state.audit||[]).length}</b> entries${(state.audit||[]).length?` · last ${audTime((state.audit||[]).slice(-1)[0].ts)}`:''}</span><button class="btn primary" type="button" data-audit-open>Open audit log</button></div></section>
   <section class="set-card"><h3>Import spreadsheet</h3><p class="help">Bring in clients from an Excel (.xlsx) or CSV file, or paste rows copied from Excel. Columns are matched by their headings and you see a preview before anything is added. New staff names in the file are added to the staff lists.</p>
   <button class="btn primary" id="btn-import">Import spreadsheet</button></section>
   </div></div>`;
@@ -1126,6 +1217,7 @@ function copyText(text,btn,label){
 
 function openArchived(id){
   const r=state.archive.find(x=>x.id===id);if(!r)return;
+  auditView(r,'Opened archive record');
   openId=null;
   const row=(k,v)=>`<div class="fld"><span class="lbl">${k}</span><span>${v||'—'}</span></div>`;
   const inc=r.kind==='incomplete';
@@ -1169,7 +1261,7 @@ function renderConfirm(c){
 let confirmDel=false;
 function closeLayer(){openId=null;closeConfirm();$('#layer').innerHTML=''}
 function closeConfirm(){confirmDel=false;$('#confirm-slot').innerHTML=''}
-function openClient(id){openId=id;confirmDel=false;renderDrawer();setTimeout(()=>$('.drawer .x')?.focus(),0)}
+function openClient(id){{const c=byId(id);if(c&&openId!==id)auditView(c,'Opened client card')}openId=id;confirmDel=false;renderDrawer();setTimeout(()=>$('.drawer .x')?.focus(),0)}
 function renderDrawer(){
   const c=byId(openId);if(!c){closeLayer();return}
   const opt=(arr,v)=>arr.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('');
@@ -1254,7 +1346,8 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-locon]')){const l=e.target.dataset.locon,a=state.sched.locs;
     if(!e.target.checked&&a.length<=1){toast('Keep at least one level of care turned on.');render();return}
     snap();state.sched.locs=e.target.checked?LEVELS.filter(x=>a.includes(x)||x===l):a.filter(x=>x!==l);saveSoon();render();return}
-  if(e.target.matches('[data-open]')){const d=e.target.dataset.open,a=state.sched.openDays;
+  if(e.target.id==='aud-act'){audF.act=e.target.value;audF.n=200;renderAudit();return}
+  if(e.target.matches("[data-openday]")){const d=e.target.dataset.openday,a=state.sched.openDays;
     if(!e.target.checked&&a.length<=1){toast('Keep at least one day turned on.');render();return}
     snap();state.sched.openDays=e.target.checked?DAYS.filter(x=>a.includes(x)||x===d):a.filter(x=>x!==d);saveSoon();render();return}
   if(e.target.matches('[data-eve]')){const d=e.target.dataset.eve;snap();const a=state.sched.eveDays;state.sched.eveDays=e.target.checked?[...a,d]:a.filter(x=>x!==d);saveSoon();render();return}
@@ -1277,6 +1370,7 @@ document.addEventListener('input',e=>{
   const c=byId(openId);
   if(c&&e.target.closest('.drawer')&&['name','referral','commitNote'].includes(e.target.dataset.f))setField(c,e.target.dataset.f,e.target.value);
   if(e.target.id==='f-search'){F.q=e.target.value;render()}
+  if(e.target.id==='aud-q'){audF.q=e.target.value;audF.n=200;const pos=e.target.selectionStart;renderAudit();const i=$('#aud-q');i.focus();i.setSelectionRange(pos,pos)}
 });
 $('#f-staff').addEventListener('change',e=>{F.staff=e.target.value;render()});
 $('#f-house').addEventListener('change',e=>{F.house=e.target.value;render()});
@@ -1384,6 +1478,9 @@ document.addEventListener('click',e=>{
     setTimeout(()=>{const d=document.querySelector('.day.today')||document.querySelector('.week .day');if(d)window.scrollTo({top:Math.max(0,d.getBoundingClientRect().top+scrollY-90),behavior:'smooth'})},60);return}
   const pm=$('#prog-menu');
   if(t.closest('[data-add-client]')){addClient();return}
+  if(t.closest('[data-audit-open]')){audF={q:'',act:'',n:200};renderAudit();setTimeout(()=>$('#aud-q')?.focus(),0);return}
+  if(t.closest('[data-audit-more]')){audF.n+=200;renderAudit();return}
+  if(t.closest('[data-audit-csv]')){auditCsv();auditEvent('System','Audit log downloaded');save();return}
   const sp=t.closest('[data-set-prog]');if(sp){switchProgram(sp.dataset.setProg);return}
   if(t.closest('[data-prog-toggle]')){pm.hidden=!pm.hidden;$('#prog-btn').setAttribute('aria-expanded',!pm.hidden);return}
   const pg=t.closest('#prog-menu [data-prog]');if(pg){pm.hidden=true;$('#prog-btn').setAttribute('aria-expanded','false');switchProgram(pg.dataset.prog);return}
@@ -1426,7 +1523,7 @@ document.addEventListener('click',e=>{
     cl.caseManager=cl.caseManager||CM[0];cl.psychApn=cl.psychApn||APN[0];cl.referral=cl.referral||'';cl.housing=cl.housing||'Commuter';cl.dcDate=cl.dcDate||'';
     state.archive=state.archive.filter(x=>x.id!==r.id);state.clients.push(cl);save();closeLayer();render();toast(`${r.name} restored to the census.`,true);return}
   if(t.id==='btn-copy-arch'){copyText(archCsv(),t,'Copy this list (CSV)');return}
-  if(t.closest('[data-undo]')){if(undoSnap){state=JSON.parse(undoSnap);undoSnap=null;save();render();toast('Undone.')}return}
+  if(t.closest('[data-undo]')){if(undoSnap){const au=state.audit;state=JSON.parse(undoSnap);state.audit=au;audPush({act:'Undo',detail:'Undid the last change (changes below)'});undoSnap=null;save();render();toast('Undone.')}return}
   if(t.id==='btn-copy'){copyCsv(t);return}
   if(t.id==='btn-import'){openImport();return}
   const sd=t.closest('[data-staff-del]');if(sd){const k=sd.dataset.staffDel,i=+sd.dataset.i,n=state.staff[k][i];snap();state.staff[k].splice(i,1);saveSoon();render();toast(`${n} removed from the list.`,true);return}
@@ -1448,7 +1545,7 @@ function addClient(){
 let resetArmed=false;
 $('#btn-reset').addEventListener('click',e=>{
   if(!resetArmed){resetArmed=true;e.target.textContent='Click again to reset';setTimeout(()=>{resetArmed=false;e.target.textContent='Reset sample data'},3000);return}
-  resetArmed=false;e.target.textContent='Reset sample data';snap();state=ensureStaff({clients:sampleFor(),archive:sampleArchiveFor(),seq:100});save();closeLayer();render();toast('Sample data restored.',true);
+  resetArmed=false;e.target.textContent='Reset sample data';snap();const au=state.audit;state=ensureStaff({clients:sampleFor(),archive:sampleArchiveFor(),seq:100});state.audit=au;auditBase=null;auditEvent('System','Sample data reset');save();closeLayer();render();toast('Sample data restored.',true);
 });
 
 /* ---------- toast ---------- */
