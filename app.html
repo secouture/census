@@ -235,7 +235,7 @@ button.stat[aria-expanded="true"]{border-color:var(--accent);box-shadow:0 0 0 3p
 .week .day.over{border-color:var(--prog)}
 .week .day .chip{background:color-mix(in srgb,var(--prog) 5%,var(--sunk));box-shadow:none;border:1px solid color-mix(in srgb,var(--prog) 12%,var(--line))}
 /* Full week: six days side by side; narrow windows scroll sideways */
-.week:not(.three){grid-template-columns:repeat(6,minmax(190px,1fr));overflow-x:auto}
+.week:not(.three){grid-template-columns:repeat(var(--ndays,6),minmax(190px,1fr));overflow-x:auto}
 .day-h{position:sticky;top:0;z-index:3;background:var(--sunk);margin:-10px -10px 0;padding:10px 12px 8px;border-radius:10px 10px 0 0}
 .day.over .day-h{background:color-mix(in srgb,var(--accent) 10%,var(--sunk))}
 .day-h .dn{font-family:var(--f-display);font-weight:800;font-size:16px}
@@ -497,7 +497,7 @@ table.census thead th:first-child{box-shadow:inset 0 -2px 0 color-mix(in srgb,va
 @media (max-width:760px){
   .board{grid-template-columns:1fr;overflow:visible}
   .week{grid-template-columns:1fr 1fr;overflow:visible}
-  .week:not(.three){grid-template-columns:repeat(6,minmax(230px,1fr));overflow-x:auto;scroll-snap-type:x proximity}
+  .week:not(.three){grid-template-columns:repeat(var(--ndays,6),minmax(230px,1fr));overflow-x:auto;scroll-snap-type:x proximity}
   .week:not(.three) .day{scroll-snap-align:start}
   .week.three{grid-template-columns:1fr}
   .brand h1{font-size:21px}
@@ -600,7 +600,7 @@ const allowedBlocks=loc=>/^PC/.test(loc)?['ALL']:['AM','PM','EVE'];
 const EVE_DAYS=['mon','tue','thu'];
 /* Per-program schedule settings (Settings page). Stored in each program's own data as state.sched. */
 const SCHED_DEFAULT=()=>({hours:{ALL:['09:00','15:30'],AM:['09:00','12:00'],PM:['12:30','15:30'],EVE:['18:00','21:00']},eveDays:['mon','tue','thu'],
-  locs:[...LEVELS],days:{PC6:[...M6],PC5:[...M5],IOP6:[...M6],IOP5:[...M5],IOP4:['mon','tue','wed','thu'],IOP3:['mon','tue','thu'],EIOP:['mon','tue','thu'],OP:['tue']}});
+  locs:[...LEVELS],openDays:[...DAYS],days:{PC6:[...M6],PC5:[...M5],IOP6:[...M6],IOP5:[...M5],IOP4:['mon','tue','wed','thu'],IOP3:['mon','tue','thu'],EIOP:['mon','tue','thu'],OP:['tue']}});
 const tShort=v=>{const [h,m]=v.split(':').map(Number);return m?`${h%12||12}:${String(m).padStart(2,'0')}`:`${h%12||12}`};
 const blockLabel=([a,b])=>`${tShort(a)}–${tShort(b)}${+b.split(':')[0]>=17?'pm':''}`;
 const words=a=>a.length<2?a.join(''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
@@ -610,13 +610,18 @@ const locOn=l=>!state.sched||!state.sched.locs||state.sched.locs.includes(l);
 const pickLocs=cur=>['Pending',...LEVELS.filter(l=>locOn(l)||l===cur)];
 /* Group chips/pills shown: groups with an offered LOC, or anyone currently in them. */
 const shownGroups=()=>GROUPS.filter(g=>LEVELS.some(l=>group(l)===g&&locOn(l))||state.clients.some(c=>group(c.loc)===g&&isActive(c)));
+/* Days the program runs at all (Settings). Days outside this list offer no groups anywhere. */
+const OPEN_DAYS=[...DAYS];
+const isOpen=d=>OPEN_DAYS.includes(d);
 function applySched(){
   if(!state.sched)state.sched=SCHED_DEFAULT();const c=state.sched;if(!c.locs)c.locs=[...LEVELS];
+  if(!c.openDays){const u=new Set();c.locs.forEach(l=>(c.days[l]||[]).forEach(d=>u.add(d)));c.openDays=u.size?DAYS.filter(d=>u.has(d)):[...DAYS];save()}
+  OPEN_DAYS.splice(0,OPEN_DAYS.length,...DAYS.filter(d=>c.openDays.includes(d)));
   BLOCK_ORDER.forEach(k=>{if(c.hours[k])BLOCKS[k].t=blockLabel(c.hours[k])});
-  EVE_DAYS.splice(0,EVE_DAYS.length,...DAYS.filter(d=>c.eveDays.includes(d)));
-  Object.keys(c.days).forEach(l=>{DEFAULT_DAYS[l]=DAYS.filter(d=>c.days[l].includes(d))});
+  EVE_DAYS.splice(0,EVE_DAYS.length,...OPEN_DAYS.filter(d=>c.eveDays.includes(d)));
+  Object.keys(c.days).forEach(l=>{DEFAULT_DAYS[l]=OPEN_DAYS.filter(d=>c.days[l].includes(d))});
 }
-const blocksFor=(loc,d)=>allowedBlocks(loc).filter(b=>b!=='EVE'||EVE_DAYS.includes(d));
+const blocksFor=(loc,d)=>!OPEN_DAYS.includes(d)?[]:allowedBlocks(loc).filter(b=>b!=='EVE'||EVE_DAYS.includes(d));
 const defaultBlock=(loc,d)=>{const b=/^PC/.test(loc)?'ALL':loc==='EIOP'?'EVE':'AM';return d&&b==='EVE'&&!EVE_DAYS.includes(d)?'AM':b};
 const EXPECT={PC6:6,PC5:5,IOP6:6,IOP5:5,IOP4:4,IOP3:3,EIOP:3};
 const CUSTOM_DAYS=['IOP4','IOP3','OP'];
@@ -873,7 +878,7 @@ function renderStats(){
     `<div class="stat"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${shownGroups().map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
     `<button type="button" class="stat link pend-btn" data-pop="today" aria-expanded="${pop==='today'}" title="Show today's admissions and discharges"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${admToday}</div><div class="s">admits today</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DCs today</div></div></div></button>`+
     `<div class="stat"><div class="k">Residence</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
-    `<a href="#schedule" class="stat link" data-goto-today title="Open today in the 3-day week view"><div class="k">Expected today</div><div class="v">${tk==='sun'?'—':todayCount}</div><div class="s">${tk==='sun'?'no groups Sunday':'scheduled'}</div></a>`+
+    `<a href="#schedule" class="stat link" data-goto-today title="Open today in the 3-day week view"><div class="k">Expected today</div><div class="v">${!isOpen(tk)?'—':todayCount}</div><div class="s">${!isOpen(tk)?'no groups today':'scheduled'}</div></a>`+
     '';
   const wk=weekEvents(), wkLeft=wk.days.reduce((n,d)=>n+(d.date>=TODAY?d.ev.length:0),0);
   $('#bell-slot').innerHTML=`<button type="button" class="attn-btn ${attn?'on':''}" data-pop="attn" aria-expanded="${pop==='attn'}" title="Needs attention" aria-label="Needs attention: ${attn}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg>${attn?`<b>${attn>99?'99+':attn}</b>`:''}</button>`;
@@ -939,12 +944,14 @@ function renderSettings(){
     <ul>${state.staff[k].map((n,i)=>`<li><input value="${esc(n)}" data-staff-edit="${k}" data-i="${i}" aria-label="${one} name"><span class="cl" title="Active clients assigned">${cnt(k,n)}</span><button type="button" class="x" data-staff-del="${k}" data-i="${i}" aria-label="Remove ${esc(n)}">×</button></li>`).join('')||'<li class="empty">No one yet</li>'}</ul>
     <form class="staff-add" data-staff-add="${k}"><input placeholder="Add ${one.replace('Case','case').replace('Clinician','clinician')}" aria-label="New ${one} name"><button class="btn small" type="submit">Add</button></form></div>`).join('')}</div></section>
   <section class="set-card"><h3>Treatment schedule · ${pn}</h3><p class="help">Group hours and days for this program. Changes apply to schedules you set from now on and to the Schedule page labels; clients' existing days aren't changed.</p>
+  <h4>Days the program runs</h4><div class="daypick">${DAYS.map(d=>`<label><input type="checkbox" data-open="${d}" ${isOpen(d)?'checked':''}>${DAY_LABEL[d]}</label>`).join('')}</div>
+  <p class="help" style="margin:6px 0 16px">Unchecked days have no groups for ${pn}: they're left off the Schedule page and can't be picked on a client's schedule.</p>
   <h4>Levels of care offered</h4><div class="daypick locpick">${LEVELS.map(l=>{const k=state.clients.filter(c=>c.loc===l&&isActive(c)).length;return `<label style="--c:${cvar(l)}"><input type="checkbox" data-locon="${l}" ${locOn(l)?'checked':''}><b>${l}</b>${k&&!locOn(l)?`<span class="of">${k} still in it</span>`:''}</label>`}).join('')}</div>
   <p class="help" style="margin:6px 0 16px">Only checked levels show in the LOC dropdowns, step-down plans and census filters for ${pn}. Turning one off doesn't move anyone: clients already in it keep it until you change them.</p>
   <div class="sched-grid">
    <div><h4>Group hours</h4><table class="set-tbl"><tbody>${BLOCK_ORDER.map(k=>`<tr><th>${BL[k]}</th><td><input type="time" step="900" value="${sc.hours[k][0]}" data-sh="${k}" data-i="0" aria-label="${BL[k]} start"> – <input type="time" step="900" value="${sc.hours[k][1]}" data-sh="${k}" data-i="1" aria-label="${BL[k]} end"></td><td class="of">${BLOCKS[k].t}</td></tr>`).join('')}</tbody></table>
-    <h4 style="margin-top:14px">Evening groups run on</h4><div class="daypick">${DAYS.map(d=>`<label><input type="checkbox" data-eve="${d}" ${sc.eveDays.includes(d)?'checked':''}>${DAY_SHORT[d]}</label>`).join('')}</div></div>
-   <div><h4>Default days by LOC</h4><table class="set-tbl days"><tbody><tr class="hd"><td></td>${DAYS.map(d=>`<td>${DAY_SHORT[d]}</td>`).join('')}</tr>${LEVELS.filter(locOn).map(l=>`<tr><th style="color:${cvar(l)}">${l}${CUSTOM_DAYS.includes(l)?' <span class="of">varies</span>':''}</th>${DAYS.map(d=>`<td><input type="checkbox" data-dd="${l}" data-day="${d}" ${sc.days[l].includes(d)?'checked':''} aria-label="${l} ${DAY_LABEL[d]}"></td>`).join('')}</tr>`).join('')}</tbody></table>
+    <h4 style="margin-top:14px">Evening groups run on</h4><div class="daypick">${OPEN_DAYS.map(d=>`<label><input type="checkbox" data-eve="${d}" ${sc.eveDays.includes(d)?'checked':''}>${DAY_SHORT[d]}</label>`).join('')}</div></div>
+   <div><h4>Default days by LOC</h4><table class="set-tbl days"><tbody><tr class="hd"><td></td>${OPEN_DAYS.map(d=>`<td>${DAY_SHORT[d]}</td>`).join('')}</tr>${LEVELS.filter(locOn).map(l=>`<tr><th style="color:${cvar(l)}">${l}${CUSTOM_DAYS.includes(l)?' <span class="of">varies</span>':''}</th>${OPEN_DAYS.map(d=>`<td><input type="checkbox" data-dd="${l}" data-day="${d}" ${sc.days[l].includes(d)?'checked':''} aria-label="${l} ${DAY_LABEL[d]}"></td>`).join('')}</tr>`).join('')}</tbody></table>
     <p class="help" style="margin-top:6px">Used when a client moves to that LOC. You can still change any client's days on their card.</p></div>
   </div></section>
   <section class="set-card"><h3>Import spreadsheet</h3><p class="help">Bring in clients from an Excel (.xlsx) or CSV file, or paste rows copied from Excel. Columns are matched by their headings and you see a preview before anything is added. New staff names in the file are added to the staff lists.</p>
@@ -962,11 +969,12 @@ function renderWeekOverview(wk){
 /* Week view range: full week = Mon–Sat; 3-day = the next 3 program days from today (Sundays skipped). Arrows shift the range. */
 let weekMode=(()=>{try{return localStorage.getItem('census-weekmode')||'full'}catch(e){return 'full'}})(), weekShift=0;
 function weekDates(){
-  if(weekMode==='full'){const d=pISO(TODAY);const dow=(d.getDay()+6)%7;const mon=addDays(TODAY,-dow+7*weekShift);return DAYS.map((k,i)=>({k,date:addDays(mon,i)}))}
+  if(weekMode==='full'){const d=pISO(TODAY);const dow=(d.getDay()+6)%7;const mon=addDays(TODAY,-dow+7*weekShift);return DAYS.map((k,i)=>({k,date:addDays(mon,i)})).filter(x=>isOpen(x.k))}
   const prog=[];let d=TODAY;const need=3*(Math.abs(weekShift)+1);const step=weekShift<0?-1:1;
-  if(dayKey(d)==='sun')d=addDays(d,1);
-  if(weekShift<0){let x=addDays(d,-1);while(prog.length<3*-weekShift){if(dayKey(x)!=='sun')prog.unshift(x);x=addDays(x,-1)}return prog.slice(0,3).map(date=>({k:dayKey(date),date}))}
-  while(prog.length<need){if(dayKey(d)!=='sun')prog.push(d);d=addDays(d,1)}
+  const ok=x=>isOpen(dayKey(x));
+  while(!ok(d))d=addDays(d,1);
+  if(weekShift<0){let x=addDays(d,-1);while(prog.length<3*-weekShift){if(ok(x))prog.unshift(x);x=addDays(x,-1)}return prog.slice(0,3).map(date=>({k:dayKey(date),date}))}
+  while(prog.length<need){if(ok(d))prog.push(d);d=addDays(d,1)}
   return prog.slice(-3).map(date=>({k:dayKey(date),date}));
 }
 function weekControls(){
@@ -992,7 +1000,7 @@ function renderSchedule(){
         ${ss.map(c=>`<button class="chip" style="--c:${cvar(c.loc)}" data-drag="sched" data-id="${c.id}" data-day="${k}" title="${esc(c.name)}"><span class="dot"></span><span class="cn">${esc(c.name)}</span><span class="tags">${c.housing==='LPD'?'<span class="h">LPD</span>':''}<span class="lv">${c.loc}</span></span></button>`).join('')}</div>`}).join('')}
     </section>`;
   }).join('');
-  return weekControls()+legend+`<div class="week ${weekMode==='3'?'three':''}">${cols}</div>`;
+  return weekControls()+legend+`<div class="week ${weekMode==='3'?'three':''}" style="--ndays:${OPEN_DAYS.length}">${cols}</div>`;
 }
 const COLS=[
   ['name','Client',c=>c.name],['alert','Alerts',c=>{const f=flags(c).sort((a,b)=>sev[a.lvl]-sev[b.lvl]);return f.length?sev[f[0].lvl]:9}],
@@ -1233,6 +1241,9 @@ document.addEventListener('change',e=>{
   if(e.target.matches('[data-locon]')){const l=e.target.dataset.locon,a=state.sched.locs;
     if(!e.target.checked&&a.length<=1){toast('Keep at least one level of care turned on.');render();return}
     snap();state.sched.locs=e.target.checked?LEVELS.filter(x=>a.includes(x)||x===l):a.filter(x=>x!==l);save();render();return}
+  if(e.target.matches('[data-open]')){const d=e.target.dataset.open,a=state.sched.openDays;
+    if(!e.target.checked&&a.length<=1){toast('Keep at least one day turned on.');render();return}
+    snap();state.sched.openDays=e.target.checked?DAYS.filter(x=>a.includes(x)||x===d):a.filter(x=>x!==d);save();render();return}
   if(e.target.matches('[data-eve]')){const d=e.target.dataset.eve;snap();const a=state.sched.eveDays;state.sched.eveDays=e.target.checked?[...a,d]:a.filter(x=>x!==d);save();render();return}
   if(e.target.matches('[data-dd]')){const l=e.target.dataset.dd,d=e.target.dataset.day;snap();const a=state.sched.days[l];state.sched.days[l]=e.target.checked?[...a,d]:a.filter(x=>x!==d);save();render();return}
   if(e.target.matches('[data-staff-edit]')){const k=e.target.dataset.staffEdit,i=+e.target.dataset.i,old=state.staff[k][i],n=e.target.value.trim();
@@ -1263,7 +1274,7 @@ function pickerHTML(ctx,x){
   const note=/^PC/.test(x.loc)?`PC meets all day, ${BLOCKS.ALL.t}.`:x.loc==='EIOP'?`EIOP meets ${eveWords()} evenings, ${BLOCKS.EVE.t}. Daytime and afternoon IOP groups are available too.`:CUSTOM_DAYS.includes(x.loc)?`${x.loc} days vary. Pick the days and a time block for each. Evening groups run ${eveWords()} only.`:`Pick a time block for each day. Evening groups run ${eveWords()} only.`;
   return `<div class="fld"><span class="lbl">Days and times · ${n}x/wk${exp&&n!==exp?` <span class="warnt">${x.loc} is ${exp} days</span>`:''}</span>
     <p class="hint">${note}</p>
-    <div class="bgrid" style="--c:${cvar(x.loc)}">${DAYS.map(d=>{const on=x.days.includes(d),b=on?((x.blocks||{})[d]||defaultBlock(x.loc,d)):'OFF';
+    <div class="bgrid" style="--c:${cvar(x.loc)}">${DAYS.filter(d=>isOpen(d)||x.days.includes(d)).map(d=>{const on=x.days.includes(d),b=on?((x.blocks||{})[d]||defaultBlock(x.loc,d)):'OFF';
       return `<div class="brow"><span class="bday">${DAY_LABEL[d]}</span><div class="bopts">${(()=>{const ok=blocksFor(x.loc,d);return ['OFF',...ok,...(b!=='OFF'&&!ok.includes(b)?[b]:[])].map(o=>{const stale=o!=='OFF'&&!ok.includes(o);return `<button type="button" data-ctx="${ctx}" data-sd="${d}" data-sb="${o}" aria-pressed="${b===o}" class="${o==='OFF'?'off':''}${stale?' stale':''}" ${stale?'title="Not offered on this day in Settings. Pick another time."':''}>${o==='OFF'?'Off':`${BLOCKS[o].n}<small>${stale?'not offered':BLOCKS[o].t}</small>`}</button>`}).join('')})()}</div></div>`}).join('')}</div></div>`;
 }
 function pickerSet(x,d,o){
