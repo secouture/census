@@ -1,7 +1,7 @@
 <title>Census - SUD</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 /* Layout: a clinical operations board. Header + census numbers, then one working view
@@ -281,7 +281,9 @@ table.census tbody tr{cursor:default}
 table.census tbody tr td:first-child{box-shadow:inset 4px 0 0 var(--c),inset -1px 0 0 var(--line)}
 table.census tr.dc td{color:var(--muted)}
 /* Compact census + archive tables */
-table.census{font-size:12px}
+table.census{font-size:12px;font-family:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-feature-settings:"tnum" 1,"cv11" 1;-webkit-font-smoothing:antialiased}
+table.census .mono,table.census .loc-sel,table.census .h-sel,table.census button,table.census select{font-family:inherit;font-variant-numeric:tabular-nums}
+table.census th{letter-spacing:.04em}
 table.census td{padding:4px 8px;line-height:1.35}
 table.census th{padding:6px 8px;font-size:10.5px}
 table.census .loc-sel,table.census .h-sel{font-size:12px;padding:2px 4px;border-radius:5px}
