@@ -75,6 +75,14 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 button.stat{font:inherit;color:inherit;text-align:left;cursor:pointer}
 button.stat:hover{border-color:var(--muted)}
 button.stat[aria-expanded="true"]{border-color:var(--crit);box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 15%,transparent)}
+.navgrp{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.attn-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:9px;padding:6px 10px;font:inherit;font-weight:600;font-size:13px;cursor:pointer;white-space:nowrap}
+.attn-btn b{min-width:20px;padding:0 6px;border-radius:999px;background:var(--sunk);color:var(--muted);font-size:12px;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
+.attn-btn.on{border-color:color-mix(in srgb,var(--crit) 45%,var(--line));color:var(--crit);background:color-mix(in srgb,var(--crit) 7%,var(--surface))}
+.attn-btn.on b{background:var(--crit);color:#fff}
+.attn-btn:hover{border-color:var(--crit)}
+.attn-btn[aria-expanded="true"]{box-shadow:0 0 0 3px color-mix(in srgb,var(--crit) 18%,transparent)}
+@media (max-width:560px){.attn-btn .lbl{display:none}}
 .attn-scrim{position:fixed;inset:0;z-index:39;background:rgba(15,20,25,.28)}
 .attn-pop{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:40;width:min(480px,calc(100vw - 32px));max-height:min(70vh,560px);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px}
 .attn-pop h2{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:6px 8px 6px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
@@ -321,11 +329,12 @@ table.arch td{white-space:normal}
   <p class="notice"><b>Prototype with made-up sample clients.</b> Don't enter real client information here. Changes save only in this browser.</p>
   <header class="top">
     <div class="brand"><h1>Census</h1><span class="date" id="today"></span></div>
+    <div class="navgrp"><div id="attn-slot"></div>
     <nav class="tabs" aria-label="Views">
       <a href="#census" data-view="census">Census</a>
       <a href="#schedule" data-view="schedule">Week</a>
       <a href="#archive" data-view="archive">Archive</a>
-    </nav>
+    </nav></div>
     <div class="actions">
       <button class="btn" id="btn-import">Import spreadsheet</button>
       <button class="btn primary" id="btn-add">Add client</button>
@@ -616,7 +625,8 @@ function renderStats(){
     `<div class="stat"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${admToday}</div><div class="s">admits today</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DCs today</div></div></div></div>`+
     `<div class="stat"><div class="k">Housing</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
     st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
-    `<button type="button" class="stat ${attn?'alert':''}" data-attn aria-expanded="${attnOpen}" aria-controls="attn-pop"><div class="k">Needs attention</div><div class="v">${attn}</div><div class="s">${attnOpen?'click to close':'click to see list'}</div></button>`+
+    '';
+  $('#attn-slot').innerHTML=`<button type="button" class="attn-btn ${attn?'on':''}" data-attn aria-expanded="${attnOpen}" aria-controls="attn-pop" title="Needs attention"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.4A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.6L18 12.6V9a6 6 0 0 0-6-6Zm-2.4 15.5a2.5 2.5 0 0 0 4.8 0Z" fill="currentColor"/></svg><span class="lbl">Needs attention</span><b>${attn}</b></button>`+
     (attnOpen?'<div class="attn-scrim"></div>'+renderAttention(state.clients):'');
 }
 function renderStaffFilter(){
