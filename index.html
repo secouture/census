@@ -93,6 +93,11 @@ body.v-settings #stats,body.v-settings .filters{display:none}
 .stat.alert .v{color:var(--crit)}
 .stats{position:relative}
 .stat.wide{grid-column:span 2}
+.stats{grid-template-columns:96px repeat(4,minmax(0,1fr))}
+.stat.add-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--accent);color:var(--accent-ink);border-color:transparent;font-weight:700;font-size:12px}
+.stat.add-tile:hover{filter:brightness(1.08);border-color:transparent}
+.stat .pills{gap:3px}
+@media (max-width:760px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat.add-tile{flex-direction:row;padding:10px}}
 .stat .split{display:flex;gap:18px}
 .stat .split>div+div{padding-left:18px;border-left:1px solid var(--line)}
 .stat .pills{margin-top:4px}
@@ -431,7 +436,6 @@ table.arch td{white-space:normal}
     <div class="brand"><h1 id="prog-title">Census - SUD</h1><span class="date" id="today"></span></div>
     <div class="actions">
       <div class="util"><a href="#settings" data-view="settings" class="gear" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.5a.5.5 0 0 0-.6-.2l-2.5 1a7.3 7.3 0 0 0-1.7-1L14.4 2.4a.5.5 0 0 0-.5-.4h-4a.5.5 0 0 0-.5.4L9 5.1a7.3 7.3 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.5a.5.5 0 0 0 .1.6L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.5c.1.2.4.3.6.2l2.5-1c.5.4 1.1.7 1.7 1l.4 2.7c0 .2.2.4.5.4h4c.2 0 .5-.2.5-.4l.4-2.7c.6-.3 1.2-.6 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.5a.5.5 0 0 0-.1-.6ZM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg></a><div id="bell-slot"></div></div>
-      <button class="btn primary" id="btn-add">Add client</button>
       <div class="prog-wrap"><button type="button" class="prog-btn" id="prog-btn" data-prog-toggle aria-haspopup="menu" aria-expanded="false"></button>
         <div class="prog-menu" id="prog-menu" role="menu" hidden>
           <div class="pm-h">Program</div>
@@ -757,7 +761,8 @@ function renderStats(){
   const attn=state.clients.filter(c=>recentDc(c)&&flags(c).some(f=>f.lvl!=='info')).length;
   const st=(k,v,s,cls='',sw='')=>`<div class="stat ${cls}"><div class="k">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   $('#stats').innerHTML=
-    `<div class="stat wide"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${GROUPS.map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
+    `<button type="button" class="stat add-tile" data-add-client title="Add a client" aria-label="Add client"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="currentColor" d="M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.6-7 4v2h11.1a6 6 0 0 1-.1-1c0-1.9.9-3.6 2.3-4.7A13 13 0 0 0 10 14Zm9 0h-2v3h-3v2h3v3h2v-3h3v-2h-3v-3Z"/></svg><span>Add client</span></button>`+
+    `<div class="stat"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${GROUPS.map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
     `<div class="stat"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${admToday}</div><div class="s">admits today</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DCs today</div></div></div></div>`+
     `<div class="stat"><div class="k">Residence</div><div class="split"><div><div class="v">${lpd}</div><div class="s">LPD</div></div><div><div class="v">${act.length-lpd}</div><div class="s">commuters</div></div></div></div>`+
     `<a href="#schedule" class="stat link" data-goto-today title="Open today in the 3-day week view"><div class="k">Expected today</div><div class="v">${tk==='sun'?'—':todayCount}</div><div class="s">${tk==='sun'?'no groups Sunday · ':'scheduled · '}<u>see schedule →</u></div></a>`+
@@ -1222,6 +1227,7 @@ document.addEventListener('click',e=>{
     if(location.hash!=='#schedule')location.hash='#schedule';else render();
     setTimeout(()=>{const d=document.querySelector('.day.today')||document.querySelector('.week .day');if(d)window.scrollTo({top:Math.max(0,d.getBoundingClientRect().top+scrollY-90),behavior:'smooth'})},60);return}
   const pm=$('#prog-menu');
+  if(t.closest('[data-add-client]')){addClient();return}
   if(t.closest('[data-prog-toggle]')){pm.hidden=!pm.hidden;$('#prog-btn').setAttribute('aria-expanded',!pm.hidden);return}
   const pg=t.closest('#prog-menu [data-prog]');if(pg){pm.hidden=true;$('#prog-btn').setAttribute('aria-expanded','false');switchProgram(pg.dataset.prog);return}
   if(!pm.hidden&&!t.closest('#prog-menu')){pm.hidden=true;$('#prog-btn').setAttribute('aria-expanded','false')}
@@ -1276,12 +1282,12 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&$('#layer').innerHTML)closeLayerOrPlanner();
   if((e.key==='Enter'||e.key===' ')&&e.target.matches('.card')){e.preventDefault();openClient(e.target.dataset.id)}
 });
-$('#btn-add').addEventListener('click',()=>{
+function addClient(){
   snap();const id='n'+(state.seq++);
   state.clients.push({id,name:'New client',loc:'Pending',plans:[],admitDate:addDays(TODAY,1),dcDate:'',days:[],blocks:{},clinician:'',caseManager:'',psychApn:'',referral:'',commitDays:0,commitNote:'',housing:'Commuter',dischargedOn:'',history:[{date:TODAY,text:'Referral entered'}]});
   save();if(view!=='census')location.hash='#census';render();openClient(id);
   setTimeout(()=>{const n=$('#d-name');n?.focus();n?.select()},10);
-});
+}
 let resetArmed=false;
 $('#btn-reset').addEventListener('click',e=>{
   if(!resetArmed){resetArmed=true;e.target.textContent='Click again to reset';setTimeout(()=>{resetArmed=false;e.target.textContent='Reset sample data'},3000);return}
