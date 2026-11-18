@@ -50,11 +50,23 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-
 .brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
 .brand h1{font-family:var(--f-display);font-weight:800;font-size:24px;letter-spacing:-.02em;margin:0}
 .brand{flex-wrap:wrap;align-items:center}
-.prog-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:9px;padding:6px 10px;font-weight:700;font-size:12.5px;cursor:pointer;letter-spacing:.03em}
-.prog-btn svg{color:var(--prog-to)}
-.prog-btn:hover{border-color:var(--prog-to)}
-:root{--prog:#2c6b70;--prog-to:#6a4bb0}
-body.prog-mh{--prog:#6a4bb0;--prog-to:#2c6b70}
+.prog-wrap{position:relative;display:inline-flex}
+.prog-btn{width:38px;height:38px;border-radius:50%;border:0;background:var(--prog);color:#fff;font-family:var(--f-display);font-weight:800;font-size:11.5px;letter-spacing:.02em;cursor:pointer;display:grid;place-items:center;box-shadow:0 0 0 3px color-mix(in srgb,var(--prog) 22%,transparent)}
+.prog-btn:hover,.prog-btn[aria-expanded="true"]{box-shadow:0 0 0 4px color-mix(in srgb,var(--prog) 35%,transparent)}
+.prog-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:45;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:6px;min-width:200px;display:flex;flex-direction:column;gap:2px}
+.prog-menu[hidden]{display:none}
+@media (max-width:560px){.prog-menu{right:auto;left:0}}
+.pm-h{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700;padding:4px 8px}
+.prog-menu button{display:flex;align-items:center;gap:10px;border:0;background:none;padding:7px 8px;border-radius:8px;font:inherit;font-weight:600;color:var(--ink);cursor:pointer;text-align:left}
+.prog-menu button:hover{background:var(--sunk)}
+.prog-menu button[aria-checked="true"]{background:var(--sunk)}
+.prog-menu button[aria-checked="true"]::after{content:"✓";margin-left:auto;color:var(--muted)}
+.pm-dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:#fff;font-family:var(--f-display);font-weight:800;font-size:10px}
+.pm-dot.sud{background:#2c6b70}.pm-dot.mh{background:#6a4bb0}
+:root{--prog:#2c6b70}
+body.prog-mh{--prog:#6a4bb0}
+/* Each program gets a slightly different page tint */
+body{background:color-mix(in srgb,var(--prog) 6%,var(--bg))}
 body.prog-mh .brand h1{color:var(--prog)}
 .brand .date{color:var(--muted);font-size:13px}
 .tabs{display:flex;gap:2px;background:var(--sunk);padding:3px;border-radius:9px}
@@ -423,7 +435,12 @@ table.arch td{white-space:normal}
     </nav><div id="bell-slot"></div></div>
     <div class="actions">
       <button class="btn primary" id="btn-add">Add client</button>
-      <button type="button" class="prog-btn" id="prog-btn" data-prog-toggle><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M7 7h11.2l-2.6-2.6L17 3l5 5-5 5-1.4-1.4L18.2 9H7V7Zm10 10H5.8l2.6 2.6L7 21l-5-5 5-5 1.4 1.4L5.8 15H17v2Z"/></svg><span id="prog-to"></span></button>
+      <div class="prog-wrap"><button type="button" class="prog-btn" id="prog-btn" data-prog-toggle aria-haspopup="menu" aria-expanded="false"></button>
+        <div class="prog-menu" id="prog-menu" role="menu" hidden>
+          <div class="pm-h">Program</div>
+          <button type="button" role="menuitemradio" data-prog="sud"><span class="pm-dot sud">SUD</span>Census - SUD</button>
+          <button type="button" role="menuitemradio" data-prog="mh"><span class="pm-dot mh">MH</span>Census - MH</button>
+        </div></div>
     </div>
   </header>
   <section class="stats" id="stats" aria-label="Census numbers"></section>
@@ -903,7 +920,8 @@ function setView(html){
 }
 function renderProgram(){
   $('#prog-title').textContent=`Census - ${PROGRAMS[PROG].name}`;document.title=`Census - ${PROGRAMS[PROG].name}`;
-  const to=PROG==='sud'?'mh':'sud';$('#prog-to').textContent=PROGRAMS[to].name;const pb=$('#prog-btn');pb.title=`Switch to Census - ${PROGRAMS[to].name}`;pb.setAttribute('aria-label',pb.title);pb.dataset.to=to;
+  const pb=$('#prog-btn');pb.textContent=PROGRAMS[PROG].name;pb.title=`Census - ${PROGRAMS[PROG].name} · click to change program`;pb.setAttribute('aria-label',pb.title);
+  document.querySelectorAll('#prog-menu [data-prog]').forEach(b=>b.setAttribute('aria-checked',b.dataset.prog===PROG));
   document.body.classList.toggle('prog-mh',PROG==='mh');
 }
 function render(){
@@ -1200,7 +1218,10 @@ document.addEventListener('click',e=>{
   const gt=t.closest('[data-goto-today]');if(gt){e.preventDefault();weekMode='3';weekShift=0;try{localStorage.setItem('census-weekmode','3')}catch(e){}
     if(location.hash!=='#schedule')location.hash='#schedule';else render();
     setTimeout(()=>{const d=document.querySelector('.day.today')||document.querySelector('.week .day');if(d)window.scrollTo({top:Math.max(0,d.getBoundingClientRect().top+scrollY-90),behavior:'smooth'})},60);return}
-  const pg=t.closest('[data-prog-toggle]');if(pg){switchProgram(pg.dataset.to);return}
+  const pm=$('#prog-menu');
+  if(t.closest('[data-prog-toggle]')){pm.hidden=!pm.hidden;$('#prog-btn').setAttribute('aria-expanded',!pm.hidden);return}
+  const pg=t.closest('#prog-menu [data-prog]');if(pg){pm.hidden=true;$('#prog-btn').setAttribute('aria-expanded','false');switchProgram(pg.dataset.prog);return}
+  if(!pm.hidden&&!t.closest('#prog-menu')){pm.hidden=true;$('#prog-btn').setAttribute('aria-expanded','false')}
   const rbl=t.closest('[data-rowbell]');
   if(rbl){const open=$('#rowpop');if(open&&open.dataset.id===rbl.dataset.rowbell){open.remove();return}showRowPop(rbl);return}
   if($('#rowpop')&&!t.closest('#rowpop'))$('#rowpop').remove();
@@ -1246,6 +1267,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&$('#confirm-slot').innerHTML){closeConfirm();return}
+  if(e.key==='Escape'&&!$('#prog-menu').hidden){$('#prog-menu').hidden=true;$('#prog-btn').setAttribute('aria-expanded','false');return}
   if(e.key==='Escape'&&$('#rowpop')){$('#rowpop').remove();return}
   if(e.key==='Escape'&&pop){pop=null;renderStats();return}
   if(e.key==='Escape'&&$('#layer').innerHTML)closeLayerOrPlanner();
