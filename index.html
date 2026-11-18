@@ -428,7 +428,7 @@ function sample(){
   const rows=[
     ['Jordan Ashby','Pending',1,null,null,'',0,1,0,'Inpatient psych unit',56,'PC 3 wks, then IOP','LPD'],
     ['Priya Desmond','Pending',2,null,null,'',2,0,1,'Detox center',84,'PC 4 wks, IOP 4 wks, OP 4 wks','LPD'],
-    ['Malik Torrance','Pending',6,null,null,'',1,2,0,'Outpatient therapist',42,'IOP 6 wks','Commuter'],
+    ['Malik Torrance','Pending',0,null,null,'',1,2,0,'Outpatient therapist',42,'IOP 6 wks','Commuter'],
     ['Avery Mendez','PC5',-16,3,40,W,0,0,0,'Inpatient psych unit',70,'PC 3 wks, IOP 4 wks, OP 3 wks','LPD'],
     ['Casey Holloway','PC6',-23,0,30,W6,1,1,1,'Detox center',84,'PC 4 wks, IOP 4 wks, OP 4 wks','LPD'],
     ['Noah Brandt','PC5',-9,12,52,W,2,2,0,'Hospital ED',56,'PC 3 wks, IOP 5 wks','Commuter'],
@@ -606,13 +606,14 @@ function renderStats(){
   const act=state.clients.filter(c=>LEVELS.includes(c.loc));
   const n=l=>state.clients.filter(c=>group(c.loc)===l).length;
   const lpd=act.filter(c=>c.housing==='LPD').length;
-  const dcToday=act.filter(c=>c.dcDate===TODAY).length;
+  const admToday=state.clients.filter(c=>c.loc==='Pending'&&c.admitDate===TODAY).length;
+  const dcToday=state.clients.filter(c=>c.dischargedOn?c.dischargedOn===TODAY:(LEVELS.includes(c.loc)&&c.dcDate===TODAY)).length;
   const tk=dayKey(TODAY), todayCount=act.filter(c=>c.days.includes(tk)).length;
   const attn=state.clients.filter(c=>recentDc(c)&&flags(c).some(f=>f.lvl!=='info')).length;
   const st=(k,v,s,cls='',sw='')=>`<div class="stat ${cls}"><div class="k">${sw?`<span class="swatch" style="background:${sw}"></span>`:''}${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   $('#stats').innerHTML=
     `<div class="stat wide"><div class="k">Active census</div><div class="v">${act.length}</div><div class="pills">${GROUPS.map(g=>`<span class="pill ${n(g)?'':'zero'}" style="--c:var(${GROUP_VAR[g]})" title="${GROUP_SUB[g]}">${g} <b>${n(g)}</b></span>`).join('')}</div></div>`+
-    `<div class="stat"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${n('Pending')}</div><div class="s">admits</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DC today</div></div></div></div>`+
+    `<div class="stat"><div class="k">Pending</div><div class="split"><div><div class="v" style="color:${cvar('Pending')}">${admToday}</div><div class="s">admits today</div></div><div><div class="v" style="color:var(--dc)">${dcToday}</div><div class="s">DCs today</div></div></div></div>`+
     st('LPD',lpd,`${act.length-lpd} commuters`)+
     st(tk==='sun'?'Expected today':'Expected today',tk==='sun'?'—':todayCount,'scheduled to attend')+
     `<button type="button" class="stat ${attn?'alert':''}" data-attn aria-expanded="${attnOpen}" aria-controls="attn-pop"><div class="k">Needs attention</div><div class="v">${attn}</div><div class="s">${attnOpen?'click to close':'click to see list'}</div></button>`+
